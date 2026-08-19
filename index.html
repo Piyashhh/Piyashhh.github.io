@@ -1,47 +1,114 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>My Space Site</title>
+    <title>My Personal Station</title>
     <style>
-        body {
-            /* Creates a moving digital gradient instead of using a space image */
-            background: linear-gradient(125deg, #000000, #0f172a, #020617, #000000);
-            background-size: 400% 400%;
-            animation: moveSpace 10s ease infinite;
-            color: #ffffff;
-            font-family: 'Courier New', Courier, monospace;
-            text-align: center;
-            padding-top: 50px;
+        * { box-sizing: border-box; }
+        body, html {
             margin: 0;
-            height: 100vh;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            color: #ffffff;
         }
 
-        @keyframes moveSpace {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
+        /* Your local background image */
+        .bg-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('bg.jpg') no-repeat center center;
+            background-size: cover;
+            z-index: -2;
+        }
+
+        /* The transparent overlay layer for floating pixel particles */
+        canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -1;
+            image-rendering: pixelated; /* Keeps particles perfectly boxy */
+        }
+
+        .content {
+            text-align: center;
+            padding-top: 15vh;
+            position: relative;
         }
 
         h1 {
-            text-shadow: 3px 3px #ff0055;
             font-size: 2.5rem;
+            text-shadow: 3px 3px 0px #000;
         }
 
-        img {
-            border: 4px solid #ffffff;
-            border-radius: 15px;
-            margin-top: 20px;
-            max-width: 80%;
-            height: auto;
+        p {
+            font-size: 1.2rem;
+            text-shadow: 2px 2px 0px #000;
         }
     </style>
 </head>
 <body>
 
-    <h1>Welcome to My Space Station!</h1>
-    <p>Floating through the cosmos with my local phone photo...</p>
-    
-    <img src="profile.jpg" alt="Space Traveler">
+    <div class="bg-container"></div>
+    <canvas id="particleCanvas"></canvas>
+
+    <div class="content">
+        <h1>Welcome to My Domain</h1>
+        <p>Custom background with randomized floating pixels!</p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Match canvas dimensions to the screen
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Create an empty storage box for particles
+        const particles = [];
+        const particleCount = 60; // Total number of moving bits
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 3 + 2, // Size between 2px and 5px
+                speedX: (Math.random() - 0.5) * 1.5, // Random left/right drift
+                speedY: (Math.random() - 0.5) * 1.5, // Random up/down drift
+                alpha: Math.random() * 0.5 + 0.3 // Random transparency values
+            });
+        }
+
+        // Loop engine to render and reposition particles indefinitely
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            particles.forEach(p => {
+                p.x += p.speedX;
+                p.y += p.speedY;
+
+                // Wrap around edges if they fly off the screen
+                if (p.x < 0) p.x = canvas.width;
+                if (p.x > canvas.width) p.x = 0;
+                if (p.y < 0) p.y = canvas.height;
+                if (p.y > canvas.height) p.y = 0;
+
+                // Draw each pixelated dot
+                ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
+                ctx.fillRect(Math.floor(p.x), Math.floor(p.y), Math.floor(p.size), Math.floor(p.size));
+            });
+
+            requestAnimationFrame(animate);
+        }
+        animate();
+    </script>
 
 </body>
 </html>
