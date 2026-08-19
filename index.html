@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Piyashhh's Space Station</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -45,51 +46,181 @@
             text-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
 
-        /* Central Glassmorphic Interface */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.07);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 24px;
-            padding: 30px;
-            width: 88%;
-            max-width: 360px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
-            text-align: center;
-            margin-bottom: 5vh;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        /* ============================================= */
+        /* Floating Music Player — icon that expands into */
+        /* a minimal glass window                         */
+        /* ============================================= */
+        .player-widget {
+            position: fixed;
+            bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            right: 24px;
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
         }
 
-        /* Music Player Dynamic Transitions */
-        .player-content { display: none; opacity: 0; transition: opacity 0.4s ease; }
-        .glass-card.playing { padding: 24px; background: rgba(255, 255, 255, 0.1); }
-        .glass-card.playing .prompt-btn { display: none; }
-        .glass-card.playing .player-content { display: block; opacity: 1; }
+        /* One-time hint bubble — fades in, then out, on its own */
+        .player-hint {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            opacity: 0;
+            transform: translateY(6px);
+            pointer-events: none;
+            animation: hintIn 0.5s ease 1s forwards, hintOut 0.6s ease 6s forwards;
+        }
+        @keyframes hintIn { to { opacity: 1; transform: translateY(0); } }
+        @keyframes hintOut { to { opacity: 0; transform: translateY(-6px); } }
 
-        /* Minimal Interactive Buttons */
-        .prompt-btn, .ctrl-btn {
-            background: rgba(255, 255, 255, 0.15);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            padding: 14px 28px;
-            border-radius: 50px;
-            font-size: 0.95rem;
-            font-weight: 500;
+        /* Collapsed state: a single round icon button */
+        .player-icon {
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; justify-content: center;
             cursor: pointer;
-            backdrop-filter: blur(5px);
-            transition: all 0.3s ease;
-            width: 100%;
+            padding: 0;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            transition: background 0.25s ease, transform 0.2s ease;
         }
-        .prompt-btn:active, .ctrl-btn:active {
-            transform: scale(0.97);
-            background: rgba(255, 255, 255, 0.3);
+        .player-icon:active { transform: scale(0.93); }
+        .player-icon svg {
+            width: 22px; height: 22px;
+            fill: none;
+            stroke: #fff;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .player-icon .icon-close { display: none; }
+        .player-widget.expanded .player-icon .icon-music { display: none; }
+        .player-widget.expanded .player-icon .icon-close { display: block; }
+
+        /* Subtle pulse ring while audio is actually playing */
+        .player-icon.playing { animation: playPulse 1.8s ease-in-out infinite; }
+        @keyframes playPulse {
+            0%, 100% { box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 0 0 rgba(255,255,255,0.3); }
+            50% { box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 0 9px rgba(255,255,255,0); }
         }
 
-        /* Compact Player Layout */
-        .song-title { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
-        .song-artist { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-bottom: 16px; }
-        .ctrl-btn { width: auto; padding: 10px 24px; font-size: 0.85rem; }
+        /* Expanded state: minimal player window */
+        .player-panel {
+            position: absolute;
+            bottom: 68px;
+            right: 0;
+            width: min(300px, calc(100vw - 48px));
+            background: rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            padding: 18px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+            transform-origin: bottom right;
+            transform: scale(0.85);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;
+        }
+        .player-widget.expanded .player-panel {
+            transform: scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .track-title {
+            font-size: 0.98rem; font-weight: 600;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .track-artist {
+            font-size: 0.78rem; color: rgba(255, 255, 255, 0.6);
+            margin-bottom: 14px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+
+        .progress-row { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+        .time-label { font-size: 0.68rem; color: rgba(255, 255, 255, 0.55); min-width: 30px; }
+        .time-label.end { text-align: right; }
+
+        input[type="range"].progress-bar {
+            -webkit-appearance: none; appearance: none;
+            flex: 1; height: 4px; border-radius: 2px;
+            background: rgba(255, 255, 255, 0.22);
+            cursor: pointer;
+        }
+        input[type="range"].progress-bar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #fff; cursor: pointer;
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.15);
+        }
+        input[type="range"].progress-bar::-moz-range-track {
+            height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.22);
+        }
+        input[type="range"].progress-bar::-moz-range-thumb {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: #fff; border: none;
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.15);
+        }
+
+        .controls-row { display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+        .play-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+        .play-btn:active { transform: scale(0.93); }
+        .play-btn svg { width: 16px; height: 16px; }
+
+        .lyrics-row { text-align: center; }
+        .lyrics-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 0.72rem;
+            padding: 6px 16px;
+            border-radius: 14px;
+            cursor: pointer;
+            letter-spacing: 0.3px;
+            transition: background 0.2s ease;
+        }
+        .lyrics-btn.active { background: rgba(255, 255, 255, 0.15); }
+        .lyrics-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        .lyrics-panel {
+            margin-top: 0; max-height: 0; overflow: hidden;
+            font-size: 0.78rem; line-height: 1.5; color: rgba(255, 255, 255, 0.75);
+            white-space: pre-line;
+            transition: max-height 0.3s ease, margin-top 0.3s ease;
+        }
+        .lyrics-panel.open {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .player-hint, .player-panel, .player-icon.playing {
+                animation: none;
+                transition: opacity 0.15s ease;
+            }
+            .player-hint { opacity: 1; transform: none; }
+            .player-panel { transform: none; }
+        }
 
         /* Minimal Footer Credits */
         footer {
@@ -118,30 +249,56 @@
         <h1>Welcome</h1>
     </header>
 
-    <!-- Glassmorphic Interface Wrapper -->
-    <div class="glass-card" id="mainCard">
-        <!-- Initial Dynamic Prompt Button -->
-        <button class="prompt-btn" onclick="activatePlayer()">Do you wanna have some music?</button>
+    <!-- Floating Music Player -->
+    <div class="player-widget" id="playerWidget">
+        <div class="player-hint" id="playerHint">Wanna have some music?</div>
 
-        <!-- Hidden Minimal Player Content -->
-        <div class="player-content">
-            <div class="song-title">Now Playing</div>
-            <div class="song-artist">Local Audio Track</div>
-            <button class="ctrl-btn" id="playPauseBtn" onclick="togglePlayback()">Pause</button>
+        <div class="player-panel" id="playerPanel">
+            <div class="track-title" id="trackTitle">Loading…</div>
+            <div class="track-artist" id="trackArtist">&nbsp;</div>
+
+            <div class="progress-row">
+                <span class="time-label" id="currentTimeLabel">0:00</span>
+                <input type="range" class="progress-bar" id="progressBar" min="0" max="100" step="0.1" value="0" aria-label="Seek">
+                <span class="time-label end" id="durationLabel">0:00</span>
+            </div>
+
+            <div class="controls-row">
+                <button type="button" class="play-btn" id="playBtn" aria-label="Play">
+                    <svg id="playIcon" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+                    <svg id="pauseIcon" viewBox="0 0 24 24" fill="#fff" style="display:none;"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+                </button>
+            </div>
+
+            <div class="lyrics-row">
+                <button type="button" class="lyrics-btn" id="lyricsBtn" disabled>Lyrics</button>
+            </div>
+
+            <div class="lyrics-panel" id="lyricsPanel"></div>
         </div>
+
+        <button type="button" class="player-icon" id="playerIcon" aria-label="Toggle music player">
+            <svg class="icon-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+            <svg class="icon-close" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
     </div>
 
-    <!-- Background Credit Footer -->
+    <!-- Minimal Footer Credits -->
     <footer>
         <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
-        Art by <a href="https://instagram.com" target="_blank">@0_00jakup</a>
+        Art by <a href="https://instagram.com" target="_blank" rel="noopener noreferrer">@0_00jakup</a>
     </footer>
 
-    <!-- Hidden HTML5 Audio Element mapping your local file -->
-    <audio id="bgMusic" src="music.flac" loop></audio>
+    <!-- Local FLAC track. Rename your file to match TRACK_SRC below, or edit the constant. -->
+    <audio id="bgMusic" preload="metadata" loop>
+        <source src="music.flac" type="audio/flac">
+        Your browser doesn't support FLAC playback.
+    </audio>
 
     <script>
-        // Particle Engine Setup
+        // ===================================================================
+        // Particle Engine (unchanged)
+        // ===================================================================
         const canvas = document.getElementById('particleCanvas');
         const ctx = canvas.getContext('2d');
         const particles = [];
@@ -179,25 +336,199 @@
         }
         animate();
 
-        // Music Player Interactive Controls
-        const audio = document.getElementById('bgMusic');
-        const card = document.getElementById('mainCard');
-        const playPauseBtn = document.getElementById('playPauseBtn');
+        // ===================================================================
+        // Music Player
+        // ===================================================================
 
-        function activatePlayer() {
-            card.classList.add('playing');
-            audio.play().catch(err => console.log("Audio block active: triggered user gesture workaround."));
-        }
+        // Path to your FLAC file, relative to this HTML file.
+        const TRACK_SRC = 'music.flac';
 
-        function togglePlayback() {
-            if (audio.paused) {
-                audio.play();
-                playPauseBtn.innerText = "Pause";
-            } else {
-                audio.pause();
-                playPauseBtn.innerText = "Play";
+        // Optional manual overrides. Leave null to auto-read from the FLAC's
+        // own tags (TITLE / ARTIST / LYRICS or UNSYNCEDLYRICS). Fill any of
+        // these in to force a value regardless of what the file says.
+        const MANUAL_OVERRIDE = {
+            title: null,
+            artist: null,
+            lyrics: null
+        };
+
+        // Reads TITLE, ARTIST and LYRICS straight out of a FLAC file's
+        // VORBIS_COMMENT metadata block — no external library needed.
+        // Only requests the first 1MB of the file (metadata always sits
+        // before the audio data), so it's cheap even on a large track.
+        // Note: this needs the page served over http(s) — opening index.html
+        // directly via file:// usually blocks the fetch, and the player will
+        // fall back to "Unknown Title" / "Unknown Artist".
+        async function readFlacMetadata(url) {
+            try {
+                const res = await fetch(url, { headers: { Range: 'bytes=0-1048575' } });
+                if (!res.ok) throw new Error('Could not fetch audio file for tag reading');
+
+                const buf = await res.arrayBuffer();
+                const view = new DataView(buf);
+
+                if (view.getUint32(0, false) !== 0x664c6143) { // "fLaC"
+                    throw new Error('Not a FLAC file');
+                }
+
+                let offset = 4;
+                let isLast = false;
+                const tags = {};
+
+                while (!isLast && offset + 4 <= buf.byteLength) {
+                    const headerByte = view.getUint8(offset);
+                    isLast = (headerByte & 0x80) !== 0;
+                    const blockType = headerByte & 0x7f;
+                    const blockLength =
+                        (view.getUint8(offset + 1) << 16) |
+                        (view.getUint8(offset + 2) << 8) |
+                        view.getUint8(offset + 3);
+                    const blockStart = offset + 4;
+
+                    if (blockType === 4) { // VORBIS_COMMENT
+                        let p = blockStart;
+                        const vendorLength = view.getUint32(p, true); p += 4 + vendorLength;
+                        const commentCount = view.getUint32(p, true); p += 4;
+
+                        for (let i = 0; i < commentCount && p < buf.byteLength; i++) {
+                            const len = view.getUint32(p, true); p += 4;
+                            const bytes = new Uint8Array(buf, p, len);
+                            const pair = new TextDecoder('utf-8').decode(bytes);
+                            p += len;
+
+                            const eq = pair.indexOf('=');
+                            if (eq > -1) {
+                                tags[pair.slice(0, eq).toUpperCase()] = pair.slice(eq + 1);
+                            }
+                        }
+                        break; // found what we need
+                    }
+
+                    offset = blockStart + blockLength;
+                }
+
+                return {
+                    title: tags.TITLE || null,
+                    artist: tags.ARTIST || null,
+                    lyrics: tags.LYRICS || tags.UNSYNCEDLYRICS || null
+                };
+            } catch (err) {
+                console.warn('FLAC metadata read failed:', err.message);
+                return { title: null, artist: null, lyrics: null };
             }
         }
+
+        // ---- Elements ----
+        const audio = document.getElementById('bgMusic');
+        const widget = document.getElementById('playerWidget');
+        const icon = document.getElementById('playerIcon');
+        const hint = document.getElementById('playerHint');
+        const playBtn = document.getElementById('playBtn');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const progressBar = document.getElementById('progressBar');
+        const currentTimeLabel = document.getElementById('currentTimeLabel');
+        const durationLabel = document.getElementById('durationLabel');
+        const trackTitleEl = document.getElementById('trackTitle');
+        const trackArtistEl = document.getElementById('trackArtist');
+        const lyricsBtn = document.getElementById('lyricsBtn');
+        const lyricsPanel = document.getElementById('lyricsPanel');
+
+        let lyricsText = null;
+        let lyricsOpen = false;
+        let isSeeking = false;
+
+        function formatTime(seconds) {
+            if (!isFinite(seconds) || seconds < 0) return '0:00';
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        // ---- Expand / collapse ----
+        function toggleWidget() {
+            const isOpen = widget.classList.toggle('expanded');
+            if (isOpen) hint.style.display = 'none';
+        }
+        icon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleWidget();
+        });
+        document.addEventListener('click', (e) => {
+            if (widget.classList.contains('expanded') && !widget.contains(e.target)) {
+                widget.classList.remove('expanded');
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && widget.classList.contains('expanded')) {
+                widget.classList.remove('expanded');
+            }
+        });
+
+        // ---- Playback ----
+        playBtn.addEventListener('click', () => {
+            if (audio.paused) audio.play().catch(() => {});
+            else audio.pause();
+        });
+        audio.addEventListener('play', () => {
+            playIcon.style.display = 'none';
+            pauseIcon.style.display = '';
+            playBtn.setAttribute('aria-label', 'Pause');
+            icon.classList.add('playing');
+        });
+        audio.addEventListener('pause', () => {
+            playIcon.style.display = '';
+            pauseIcon.style.display = 'none';
+            playBtn.setAttribute('aria-label', 'Play');
+            icon.classList.remove('playing');
+        });
+
+        // ---- Progress bar (drag-to-seek without fighting playback updates) ----
+        audio.addEventListener('loadedmetadata', () => {
+            durationLabel.textContent = formatTime(audio.duration);
+        });
+        audio.addEventListener('timeupdate', () => {
+            if (!audio.duration || isSeeking) return;
+            progressBar.value = (audio.currentTime / audio.duration) * 100;
+            currentTimeLabel.textContent = formatTime(audio.currentTime);
+        });
+        progressBar.addEventListener('input', () => {
+            isSeeking = true;
+            if (audio.duration) {
+                currentTimeLabel.textContent = formatTime((progressBar.value / 100) * audio.duration);
+            }
+        });
+        progressBar.addEventListener('change', () => {
+            if (audio.duration) {
+                audio.currentTime = (progressBar.value / 100) * audio.duration;
+            }
+            isSeeking = false;
+        });
+
+        // ---- Lyrics ----
+        lyricsBtn.addEventListener('click', () => {
+            lyricsOpen = !lyricsOpen;
+            lyricsPanel.classList.toggle('open', lyricsOpen);
+            lyricsBtn.classList.toggle('active', lyricsOpen);
+            if (lyricsOpen) lyricsPanel.textContent = lyricsText;
+        });
+
+        // ---- Init ----
+        (async function initPlayer() {
+            const meta = await readFlacMetadata(TRACK_SRC);
+
+            trackTitleEl.textContent = MANUAL_OVERRIDE.title || meta.title || 'Unknown Title';
+            trackArtistEl.textContent = MANUAL_OVERRIDE.artist || meta.artist || 'Unknown Artist';
+
+            lyricsText = MANUAL_OVERRIDE.lyrics || meta.lyrics || null;
+            if (lyricsText) {
+                lyricsBtn.disabled = false;
+                lyricsBtn.textContent = 'Lyrics';
+            } else {
+                lyricsBtn.disabled = true;
+                lyricsBtn.textContent = 'Lyrics unavailable';
+            }
+        })();
     </script>
 </body>
 </html>
