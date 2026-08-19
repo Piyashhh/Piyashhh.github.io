@@ -1,20 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>My Personal Station</title>
+    <title>Piyashhh's Space Station</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             overflow: hidden;
-            font-family: 'Courier New', Courier, monospace;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
         }
 
-        /* Your local background image */
+        /* Fixed custom background image */
         .bg-container {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -23,30 +25,88 @@
             z-index: -2;
         }
 
-        /* The transparent overlay layer for floating pixel particles */
+        /* Moving pixel overlay */
         canvas {
             position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             z-index: -1;
-            image-rendering: pixelated; /* Keeps particles perfectly boxy */
+            image-rendering: pixelated;
         }
 
-        .content {
+        /* Top Header Area */
+        header {
+            margin-top: 12vh;
             text-align: center;
-            padding-top: 15vh;
-            position: relative;
         }
-
         h1 {
-            font-size: 2.5rem;
-            text-shadow: 3px 3px 0px #000;
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.5);
         }
 
-        p {
-            font-size: 1.2rem;
-            text-shadow: 2px 2px 0px #000;
+        /* Central Glassmorphic Interface */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 24px;
+            padding: 30px;
+            width: 88%;
+            max-width: 360px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            text-align: center;
+            margin-bottom: 5vh;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
+
+        /* Music Player Dynamic Transitions */
+        .player-content { display: none; opacity: 0; transition: opacity 0.4s ease; }
+        .glass-card.playing { padding: 24px; background: rgba(255, 255, 255, 0.1); }
+        .glass-card.playing .prompt-btn { display: none; }
+        .glass-card.playing .player-content { display: block; opacity: 1; }
+
+        /* Minimal Interactive Buttons */
+        .prompt-btn, .ctrl-btn {
+            background: rgba(255, 255, 255, 0.15);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        .prompt-btn:active, .ctrl-btn:active {
+            transform: scale(0.97);
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Compact Player Layout */
+        .song-title { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+        .song-artist { font-size: 0.8rem; color: rgba(255,255,255,0.6); margin-bottom: 16px; }
+        .ctrl-btn { width: auto; padding: 10px 24px; font-size: 0.85rem; }
+
+        /* Minimal Footer Credits */
+        footer {
+            margin-bottom: 4vh;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(8px);
+            padding: 8px 16px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            letter-spacing: 0.3px;
+        }
+        footer a { color: rgba(255,255,255,0.8); text-decoration: none; font-weight: 600; }
+        footer svg { width: 12px; height: 12px; fill: currentColor; opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -54,16 +114,38 @@
     <div class="bg-container"></div>
     <canvas id="particleCanvas"></canvas>
 
-    <div class="content">
-        <h1>Welcome to My Domain</h1>
-        <p>Custom background with randomized floating pixels!</p>
+    <header>
+        <h1>Welcome</h1>
+    </header>
+
+    <!-- Glassmorphic Interface Wrapper -->
+    <div class="glass-card" id="mainCard">
+        <!-- Initial Dynamic Prompt Button -->
+        <button class="prompt-btn" onclick="activatePlayer()">Do you wanna have some music?</button>
+
+        <!-- Hidden Minimal Player Content -->
+        <div class="player-content">
+            <div class="song-title">Now Playing</div>
+            <div class="song-artist">Local Audio Track</div>
+            <button class="ctrl-btn" id="playPauseBtn" onclick="togglePlayback()">Pause</button>
+        </div>
     </div>
 
+    <!-- Background Credit Footer -->
+    <footer>
+        <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+        Art by <a href="https://instagram.com" target="_blank">@0_00jakup</a>
+    </footer>
+
+    <!-- Hidden HTML5 Audio Element mapping your local file -->
+    <audio id="bgMusic" src="music.flac" loop></audio>
+
     <script>
+        // Particle Engine Setup
         const canvas = document.getElementById('particleCanvas');
         const ctx = canvas.getContext('2d');
+        const particles = [];
 
-        // Match canvas dimensions to the screen
         function resize() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -71,44 +153,51 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // Create an empty storage box for particles
-        const particles = [];
-        const particleCount = 60; // Total number of moving bits
-
-        for (let i = 0; i < particleCount; i++) {
+        for (let i = 0; i < 40; i++) {
             particles.push({
                 x: Math.random() * canvas.width,
                 y: Math.random() * canvas.height,
-                size: Math.random() * 3 + 2, // Size between 2px and 5px
-                speedX: (Math.random() - 0.5) * 1.5, // Random left/right drift
-                speedY: (Math.random() - 0.5) * 1.5, // Random up/down drift
-                alpha: Math.random() * 0.5 + 0.3 // Random transparency values
+                size: Math.random() * 2 + 1.5,
+                speedX: (Math.random() - 0.5) * 0.8,
+                speedY: (Math.random() - 0.5) * 0.8,
+                alpha: Math.random() * 0.4 + 0.2
             });
         }
 
-        // Loop engine to render and reposition particles indefinitely
         function animate() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
             particles.forEach(p => {
-                p.x += p.speedX;
-                p.y += p.speedY;
-
-                // Wrap around edges if they fly off the screen
+                p.x += p.speedX; p.y += p.speedY;
                 if (p.x < 0) p.x = canvas.width;
                 if (p.x > canvas.width) p.x = 0;
                 if (p.y < 0) p.y = canvas.height;
                 if (p.y > canvas.height) p.y = 0;
-
-                // Draw each pixelated dot
                 ctx.fillStyle = `rgba(255, 255, 255, ${p.alpha})`;
                 ctx.fillRect(Math.floor(p.x), Math.floor(p.y), Math.floor(p.size), Math.floor(p.size));
             });
-
             requestAnimationFrame(animate);
         }
         animate();
-    </script>
 
+        // Music Player Interactive Controls
+        const audio = document.getElementById('bgMusic');
+        const card = document.getElementById('mainCard');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+
+        function activatePlayer() {
+            card.classList.add('playing');
+            audio.play().catch(err => console.log("Audio block active: triggered user gesture workaround."));
+        }
+
+        function togglePlayback() {
+            if (audio.paused) {
+                audio.play();
+                playPauseBtn.innerText = "Pause";
+            } else {
+                audio.pause();
+                playPauseBtn.innerText = "Play";
+            }
+        }
+    </script>
 </body>
 </html>
