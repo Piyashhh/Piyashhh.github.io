@@ -5,6 +5,12 @@
     <title>Piyashhh's Space Station</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+      @font-face {
+            font-family: 'MyLocalFont';
+            src: url('customfont.ttf'); /* Update the extension if it is .woff2 or .otf */
+            font-weight: normal;
+            font-style: normal;
+      }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body, html {
             width: 100%; height: 100%;
@@ -199,9 +205,12 @@
         .lyrics-btn.active { background: rgba(255, 255, 255, 0.15); }
         .lyrics-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-        .lyrics-panel {
+                .lyrics-panel {
             margin-top: 0; max-height: 0; overflow: hidden;
-            font-size: 0.78rem; line-height: 1.5; color: rgba(255, 255, 255, 0.75);
+            font-family: 'MyLocalFont', sans-serif; /* Updated here */
+            font-size: 0.85rem; line-height: 1.6; color: rgba(255, 255, 255, 0.5);
+            /* ... rest of your existing CSS remains the same */
+
             white-space: pre-line;
             transition: max-height 0.3s ease, margin-top 0.3s ease;
         }
@@ -263,12 +272,22 @@
                 <span class="time-label end" id="durationLabel">0:00</span>
             </div>
 
-            <div class="controls-row">
+                                    <div class="controls-row">
+                <button type="button" class="play-btn" id="prevBtn" aria-label="Previous Track" style="margin-right: 12px; width: 36px; height: 36px;">
+                    <svg viewBox="0 0 24 24" fill="#fff"><path d="M18 6l-8.5 6 8.5 6V6zM8 6v12h-2V6h2z"/></svg>
+                </button>
+                
                 <button type="button" class="play-btn" id="playBtn" aria-label="Play">
                     <svg id="playIcon" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
                     <svg id="pauseIcon" viewBox="0 0 24 24" fill="#fff" style="display:none;"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
                 </button>
+                
+                <button type="button" class="play-btn" id="nextBtn" aria-label="Next Track" style="margin-left: 12px; width: 36px; height: 36px;">
+                    <svg viewBox="0 0 24 24" fill="#fff"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                </button>
             </div>
+
+
 
             <div class="lyrics-row">
                 <button type="button" class="lyrics-btn" id="lyricsBtn" disabled>Lyrics</button>
@@ -290,8 +309,9 @@
 </footer>
 
 
-    <!-- Local FLAC track. Rename your file to match TRACK_SRC below, or edit the constant. -->
-    <audio id="bgMusic" preload="metadata" loop>
+        <!-- Dynamic Audio Player -->
+    <audio id="bgMusic" preload="metadata"></audio>
+
         <source src="music.flac" type="audio/flac">
         Your browser doesn't support FLAC playback.
     </audio>
@@ -342,16 +362,14 @@
         // ===================================================================
 
         // Path to your FLAC file, relative to this HTML file.
-        const TRACK_SRC = 'music.flac';
+                // Your playlist array
+        const TRACK_LIST = ['music.flac', 'music2.flac'];
+        let currentTrackIndex = 0;
 
         // Optional manual overrides. Leave null to auto-read from the FLAC's
         // own tags (TITLE / ARTIST / LYRICS or UNSYNCEDLYRICS). Fill any of
         // these in to force a value regardless of what the file says.
-        const MANUAL_OVERRIDE = {
-            title: null,
-            artist: null,
-            lyrics: null
-        };
+        
 
         // Reads TITLE, ARTIST and LYRICS straight out of a FLAC file's
         // VORBIS_COMMENT metadata block — no external library needed.
@@ -515,21 +533,56 @@
         });
 
         // ---- Init ----
-        (async function initPlayer() {
-            const meta = await readFlacMetadata(TRACK_SRC);
+                // ---- Playlist & Init ----
+        const nextBtn = document.getElementById('nextBtn');
+        
+        const prevBtn = document.getElementById('prevBtn'); // Add this line
 
-            trackTitleEl.textContent = MANUAL_OVERRIDE.title || meta.title || 'Unknown Title';
-            trackArtistEl.textContent = MANUAL_OVERRIDE.artist || meta.artist || 'Unknown Artist';
+        async function loadTrack(index, autoPlay = false) {
+            const src = TRACK_LIST[index];
+            audio.src = src;
 
-            lyricsText = MANUAL_OVERRIDE.lyrics || meta.lyrics || null;
+            trackTitleEl.textContent = 'Loading…';
+            trackArtistEl.textContent = '\u00A0';
+            lyricsBtn.disabled = true;
+            lyricsBtn.textContent = 'Lyrics';
+
+            const meta = await readFlacMetadata(src);
+            trackTitleEl.textContent = meta.title || src; // Fallback to filename if no metadata
+            trackArtistEl.textContent = meta.artist || 'Unknown Artist';
+            lyricsText = meta.lyrics || null;
+
             if (lyricsText) {
                 lyricsBtn.disabled = false;
-                lyricsBtn.textContent = 'Lyrics';
             } else {
                 lyricsBtn.disabled = true;
                 lyricsBtn.textContent = 'Lyrics unavailable';
             }
-        })();
+
+            if (autoPlay) audio.play().catch(() => {});
+        }
+        // Previous button click
+        prevBtn.addEventListener('click', () => {
+            // Adds TRACK_LIST.length before modulo to handle negative numbers
+            currentTrackIndex = (currentTrackIndex - 1 + TRACK_LIST.length) % TRACK_LIST.length;
+            loadTrack(currentTrackIndex, true);
+        });
+
+        // Next button click
+        nextBtn.addEventListener('click', () => {
+            currentTrackIndex = (currentTrackIndex + 1) % TRACK_LIST.length;
+            loadTrack(currentTrackIndex, true);
+        });
+
+        // Auto-play next song when current finishes
+        audio.addEventListener('ended', () => {
+            currentTrackIndex = (currentTrackIndex + 1) % TRACK_LIST.length;
+            loadTrack(currentTrackIndex, true);
+        });
+
+        // Initialize first track
+        loadTrack(currentTrackIndex, false);
+
     </script>
 </body>
 </html>
