@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Piyashhh's Space Station</title>
+    <title>Piyashhh hadn't thought of a name yet</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
       @font-face {
@@ -232,8 +232,9 @@
         }
 
         /* Minimal Footer Credits */
-        footer {
-            margin-bottom: 4vh;
+                footer {
+            position: absolute; /* Changed from margin-bottom */
+            bottom: 4vh;        /* Locks it to the bottom */
             background: rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(8px);
             padding: 8px 16px;
@@ -244,6 +245,9 @@
             gap: 6px;
             font-size: 0.75rem;
             letter-spacing: 0.3px;
+        }
+        footer a { color: rgba(255,255,255,0.8); text-decoration: none; font-weight: 600; }
+
         }
         footer a { color: rgba(255,255,255,0.8); text-decoration: none; font-weight: 600; }
         footer svg { width: 12px; height: 12px; fill: currentColor; opacity: 0.8; }
@@ -309,12 +313,9 @@
 </footer>
 
 
-        <!-- Dynamic Audio Player -->
+            <!-- Dynamic Audio Player -->
     <audio id="bgMusic" preload="metadata"></audio>
 
-        <source src="music.flac" type="audio/flac">
-        Your browser doesn't support FLAC playback.
-    </audio>
 
     <script>
         // ===================================================================
@@ -538,29 +539,66 @@
         
         const prevBtn = document.getElementById('prevBtn'); // Add this line
 
-        async function loadTrack(index, autoPlay = false) {
+                async function loadTrack(index, autoPlay = false) {
             const src = TRACK_LIST[index];
             audio.src = src;
 
             trackTitleEl.textContent = 'Loading…';
             trackArtistEl.textContent = '\u00A0';
+            
+            // FIX 3: Force collapse lyrics when song changes
+            lyricsOpen = false;
+            lyricsPanel.classList.remove('open');
+            lyricsBtn.classList.remove('active');
+            
             lyricsBtn.disabled = true;
             lyricsBtn.textContent = 'Lyrics';
+            lyricsPanel.innerHTML = '';
+            parsedLyrics = [];
 
             const meta = await readFlacMetadata(src);
-            trackTitleEl.textContent = meta.title || src; // Fallback to filename if no metadata
+            trackTitleEl.textContent = meta.title || src;
             trackArtistEl.textContent = meta.artist || 'Unknown Artist';
             lyricsText = meta.lyrics || null;
 
             if (lyricsText) {
                 lyricsBtn.disabled = false;
+                
+                const lines = lyricsText.split('\n');
+                // Regex for extracting the time calculation
+                const timeRegEx = /\[(\d{2,}):(\d{2})\.(\d{1,3})\]/; 
+                let isLRC = false;
+
+                lines.forEach(line => {
+                    const match = line.match(timeRegEx);
+                    if (match) {
+                        isLRC = true;
+                        const time = parseInt(match[1]) * 60 + parseInt(match[2]) + parseFloat('0.' + match[3]);
+                        
+                        // FIX 2: Global regex to strip ALL timestamps from the visual text
+                        const cleanText = line.replace(/\[\d{2,}:\d{2}\.\d{1,3}\]/g, '').trim();
+                        
+                        if (cleanText) {
+                            const el = document.createElement('div');
+                            el.className = 'lyric-line';
+                            el.textContent = cleanText;
+                            lyricsPanel.appendChild(el);
+                            parsedLyrics.push({ time, el });
+                        }
+                    }
+                });
+
+                if (!isLRC) {
+                    // Fallback: If it's not synced LRC, strip any malformed brackets just in case
+                    lyricsPanel.textContent = lyricsText.replace(/\[.*?\]/g, '').trim();
+                }
             } else {
-                lyricsBtn.disabled = true;
                 lyricsBtn.textContent = 'Lyrics unavailable';
             }
 
             if (autoPlay) audio.play().catch(() => {});
         }
+
         // Previous button click
         prevBtn.addEventListener('click', () => {
             // Adds TRACK_LIST.length before modulo to handle negative numbers
