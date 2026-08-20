@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Piyashhh hadn't thought of a name yet</title>
+    <title>Piyashhh's Space Station</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
       @font-face {
@@ -23,7 +23,7 @@
             justify-content: space-between;
         }
 
-        /* Fixed custom background image */
+        /* Your photo as the full-bleed background */
         .bg-container {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -205,12 +205,10 @@
         .lyrics-btn.active { background: rgba(255, 255, 255, 0.15); }
         .lyrics-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 
-                .lyrics-panel {
+        .lyrics-panel {
             margin-top: 0; max-height: 0; overflow: hidden;
-            font-family: 'MyLocalFont', sans-serif; /* Updated here */
+            font-family: 'MyLocalFont', sans-serif;
             font-size: 0.85rem; line-height: 1.6; color: rgba(255, 255, 255, 0.5);
-            /* ... rest of your existing CSS remains the same */
-
             white-space: pre-line;
             transition: max-height 0.3s ease, margin-top 0.3s ease;
         }
@@ -222,19 +220,84 @@
             overflow-y: auto;
         }
 
+        /* ============================================= */
+        /* Hamburger menu — same expand pattern as the    */
+        /* music widget, opposite corner, plain text only */
+        /* ============================================= */
+        .nav-widget {
+            position: fixed;
+            bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            left: 24px;
+            z-index: 20;
+        }
+        .nav-icon {
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            transition: background 0.25s ease, transform 0.2s ease;
+        }
+        .nav-icon:active { transform: scale(0.93); }
+        .nav-icon svg {
+            width: 22px; height: 22px;
+            fill: none; stroke: #fff;
+            stroke-width: 2; stroke-linecap: round;
+        }
+        .nav-icon .icon-close { display: none; }
+        .nav-widget.expanded .nav-icon .icon-menu { display: none; }
+        .nav-widget.expanded .nav-icon .icon-close { display: block; }
+
+        .nav-panel {
+            position: absolute;
+            bottom: 68px;
+            left: 0;
+            background: rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 18px;
+            padding: 8px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+            transform-origin: bottom left;
+            transform: scale(0.85);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;
+        }
+        .nav-widget.expanded .nav-panel {
+            transform: scale(1);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .nav-link {
+            display: block;
+            padding: 10px 14px;
+            border-radius: 12px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .nav-link:active { background: rgba(255, 255, 255, 0.12); }
+
         @media (prefers-reduced-motion: reduce) {
-            .player-hint, .player-panel, .player-icon.playing {
+            .player-hint, .player-panel, .player-icon.playing, .nav-panel {
                 animation: none;
                 transition: opacity 0.15s ease;
             }
             .player-hint { opacity: 1; transform: none; }
-            .player-panel { transform: none; }
+            .player-panel, .nav-panel { transform: none; }
         }
 
         /* Minimal Footer Credits */
-                footer {
-            position: absolute; /* Changed from margin-bottom */
-            bottom: 4vh;        /* Locks it to the bottom */
+        footer {
+            position: absolute; /* pinned to the bottom instead of flex-spaced, so it holds still */
+            bottom: 4vh;
             background: rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(8px);
             padding: 8px 16px;
@@ -245,9 +308,6 @@
             gap: 6px;
             font-size: 0.75rem;
             letter-spacing: 0.3px;
-        }
-        footer a { color: rgba(255,255,255,0.8); text-decoration: none; font-weight: 600; }
-
         }
         footer a { color: rgba(255,255,255,0.8); text-decoration: none; font-weight: 600; }
         footer svg { width: 12px; height: 12px; fill: currentColor; opacity: 0.8; }
@@ -261,6 +321,17 @@
     <header>
         <h1>Welcome</h1>
     </header>
+
+    <!-- Site menu -->
+    <div class="nav-widget" id="navWidget">
+        <div class="nav-panel" id="navPanel">
+            <a href="duggapujo.html" class="nav-link">Dugga Pujo</a>
+        </div>
+        <button type="button" class="nav-icon" id="navIcon" aria-label="Menu">
+            <svg class="icon-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="20" y2="17"></line></svg>
+            <svg class="icon-close" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+    </div>
 
     <!-- Floating Music Player -->
     <div class="player-widget" id="playerWidget">
@@ -362,15 +433,9 @@
         // Music Player
         // ===================================================================
 
-        // Path to your FLAC file, relative to this HTML file.
-                // Your playlist array
+        // Your playlist — add as many tracks as you want, in order.
         const TRACK_LIST = ['music.flac', 'music2.flac'];
         let currentTrackIndex = 0;
-
-        // Optional manual overrides. Leave null to auto-read from the FLAC's
-        // own tags (TITLE / ARTIST / LYRICS or UNSYNCEDLYRICS). Fill any of
-        // these in to force a value regardless of what the file says.
-        
 
         // Reads TITLE, ARTIST and LYRICS straight out of a FLAC file's
         // VORBIS_COMMENT metadata block — no external library needed.
@@ -457,6 +522,7 @@
         let lyricsText = null;
         let lyricsOpen = false;
         let isSeeking = false;
+        let parsedLyrics = []; // was being written to with no declaration anywhere — added this
 
         function formatTime(seconds) {
             if (!isFinite(seconds) || seconds < 0) return '0:00';
@@ -482,6 +548,24 @@
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && widget.classList.contains('expanded')) {
                 widget.classList.remove('expanded');
+            }
+        });
+
+        // ---- Site menu expand / collapse ----
+        const navWidget = document.getElementById('navWidget');
+        const navIcon = document.getElementById('navIcon');
+        navIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navWidget.classList.toggle('expanded');
+        });
+        document.addEventListener('click', (e) => {
+            if (navWidget.classList.contains('expanded') && !navWidget.contains(e.target)) {
+                navWidget.classList.remove('expanded');
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && navWidget.classList.contains('expanded')) {
+                navWidget.classList.remove('expanded');
             }
         });
 
@@ -533,13 +617,11 @@
             if (lyricsOpen) lyricsPanel.textContent = lyricsText;
         });
 
-        // ---- Init ----
-                // ---- Playlist & Init ----
+        // ---- Playlist & Init ----
         const nextBtn = document.getElementById('nextBtn');
-        
-        const prevBtn = document.getElementById('prevBtn'); // Add this line
+        const prevBtn = document.getElementById('prevBtn');
 
-                async function loadTrack(index, autoPlay = false) {
+        async function loadTrack(index, autoPlay = false) {
             const src = TRACK_LIST[index];
             audio.src = src;
 
