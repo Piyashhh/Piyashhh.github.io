@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Dugga Pujo — Piyashhh's Space Station</title>
+    <title>আগমনী — Piyashhh's Space Station</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         /* Same file as index.html's lyrics font — Hind Siliguri, covers Bangla + Latin */
@@ -26,19 +26,20 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
         }
 
-        /* Your photo as the full-bleed background. */
-        /* If it isn't a .jpg, update this filename to match (e.g. duggapujobg.png) */
+        /* Background photo — swapped dynamically by JS based on the current
+           Pujo phase and time of day in Kolkata. This is just the fallback
+           shown before that first runs. */
         .bg-container {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: url('duggapujobg.jpeg') no-repeat center center;
+            background: url('bg-day.jpg') no-repeat center center;
             background-size: cover;
-            z-index: -3;
+            z-index: -2;
+            transition: opacity 0.4s ease;
         }
-        
 
         /* Same particle engine as the homepage, recolored warm */
         canvas {
@@ -80,7 +81,7 @@
         .puja-header {
             text-align: center;
             padding: 0 24px;
-            margin-bottom: 22px;
+            margin-top: 10vh;
         }
         .puja-header h1 {
             font-size: 2.4rem;
@@ -95,6 +96,10 @@
         }
 
         .countdown-card {
+            position: fixed;
+            bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+            left: 50%;
+            transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.08);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
@@ -105,7 +110,57 @@
             max-width: 380px;
             text-align: center;
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            z-index: 15;
         }
+        .card-collapse-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            padding: 0;
+        }
+        .card-collapse-btn svg {
+            width: 14px; height: 14px;
+            fill: none; stroke: #fff; stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+
+        /* Collapsed state — a pill that fills the bar between the left edge
+           (or a left-side button, if this page ever gets one like the
+           homepage's hamburger menu — adjust the `left` value then) and the
+           music icon on the right, sitting on the same row as it. */
+        .countdown-pill {
+            position: fixed;
+            bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            left: 24px;
+            right: calc(24px + 56px + 12px); /* music widget's own 24px margin + its 56px icon + a 12px gap */
+            height: 56px;
+            border-radius: 28px;
+            background: rgba(255, 255, 255, 0.09);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 200, 140, 0.25);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0 18px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #fff;
+            cursor: pointer;
+            z-index: 20;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            transition: transform 0.2s ease;
+        }
+        .countdown-pill:active { transform: scale(0.98); }
         .phase-label {
             font-size: 0.72rem;
             letter-spacing: 1.5px;
@@ -116,16 +171,16 @@
         .phase-name {
             font-size: 1.35rem;
             font-weight: 700;
-            margin-bottom: 18px;
+            margin-bottom: 22px;
         }
 
         .countdown-grid {
             display: flex;
             justify-content: center;
-            gap: 14px;
-            margin-bottom: 16px;
+            gap: 10px;
+            margin-bottom: 20px;
         }
-        .countdown-unit { min-width: 54px; }
+        .countdown-unit { min-width: 46px; }
         .countdown-unit .num {
             font-size: 1.9rem;
             font-weight: 700;
@@ -267,18 +322,20 @@
 <body>
 
     <div class="bg-container"></div>
-    <div class="bg-scrim"></div>
     <canvas id="particleCanvas"></canvas>
 
     <a href="index.html" class="back-link">← Space Station</a>
     <div class="bg-credit" id="bgCredit"></div>
 
     <header class="puja-header">
-        <h1>দুর্গোৎসব</h1>
+        <h1>আগমনী</h1>
         <p id="subheading">&nbsp;</p>
     </header>
 
-    <div class="countdown-card">
+    <div class="countdown-card" id="countdownCard">
+        <button type="button" class="card-collapse-btn" id="collapseBtn" aria-label="Collapse countdown">
+            <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
         <div class="phase-label" id="phaseLabel">Counting down to</div>
         <div class="phase-name" id="phaseName">—</div>
 
@@ -292,7 +349,9 @@
         <div class="phase-blurb" id="phaseBlurb"></div>
     </div>
 
-    <!-- Music widget, one track per named day -->
+    <button type="button" class="countdown-pill" id="countdownPill" aria-label="Expand countdown"></button>
+
+    <!-- Music widget — ambient theme (auto) + a per-day playlist you browse manually -->
     <div class="player-widget" id="playerWidget">
         <div class="player-panel" id="playerPanel">
             <div class="track-title" id="trackTitle">—</div>
@@ -305,9 +364,15 @@
             </div>
 
             <div class="controls-row">
+                <button type="button" class="play-btn" id="prevBtn" aria-label="Previous track" disabled style="margin-right: 12px; width: 36px; height: 36px;">
+                    <svg viewBox="0 0 24 24" fill="#fff"><path d="M18 6l-8.5 6 8.5 6V6zM8 6v12h-2V6h2z"/></svg>
+                </button>
                 <button type="button" class="play-btn" id="playBtn" aria-label="Play" disabled>
                     <svg id="playIcon" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
                     <svg id="pauseIcon" viewBox="0 0 24 24" fill="#fff" style="display:none;"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+                </button>
+                <button type="button" class="play-btn" id="nextBtn" aria-label="Next track" disabled style="margin-left: 12px; width: 36px; height: 36px;">
+                    <svg viewBox="0 0 24 24" fill="#fff"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
                 </button>
             </div>
         </div>
@@ -318,7 +383,10 @@
         </button>
     </div>
 
+    <!-- Playlist track playback -->
     <audio id="phaseAudio" preload="none"></audio>
+    <!-- Ambient theme — separate element so it can duck under the playlist independently -->
+    <audio id="themeAudio" preload="none"></audio>
 
     <script>
         // ===================================================================
@@ -381,21 +449,32 @@
         // Dugga Pujo phases
         // ===================================================================
         // Dates are simplified to midnight-to-midnight IST calendar days
-        // rather than exact tithi transition times (those shift by minutes
-        // each year and need a Panchang lookup) — accurate enough for a
-        // countdown, not a ritual timing tool. Update the dates every year;
-        // Durga Puja follows the Hindu lunisolar calendar, so it lands on
-        // different Gregorian dates annually.
+        // rather than exact tithi transition times (those shift by hours
+        // and need a Panchang lookup) — accurate enough for a countdown,
+        // not a ritual timing tool. Cross-checked against several
+        // Kolkata-specific sources; Saptami genuinely spans two calendar
+        // days this year (a "stretched" tithi), which is why it isn't
+        // exactly 24h like the others — the window-chaining logic below
+        // handles that automatically since Saptami's window just runs
+        // until Ashtami's start.
+        //
+        // Update every year — Durga Puja follows the lunisolar calendar,
+        // so these dates shift annually.
         //
         // Add a track once you have one, e.g.:
-        //   track: { src: 'mahalaya.flac', title: 'Mahalaya Dawn', artist: 'Your name' }
+        //   track: { src: 'মহালয়া .flac', title: 'মহালয়া  Dawn', artist: 'Your name' }
         const DUGGA_PUJO_PHASES = [
-            { key: 'mahalaya', label: 'মহালয়া',       start: '2026-10-10T00:00:00+05:30', blurb: 'দেবীপক্ষের সূচনা', track: null },
-            { key: 'shashthi', label: 'Shashthi',       start: '2026-10-17T00:00:00+05:30', blurb: 'Bodhon — the goddess is ceremonially awakened.', track: null },
-            { key: 'saptami',  label: 'Saptami',        start: '2026-10-18T00:00:00+05:30', blurb: 'The second day of worship.', track: null },
-            { key: 'ashtami',  label: 'Ashtami',        start: '2026-10-19T00:00:00+05:30', blurb: 'The most significant day — Sandhi Puja at twilight.', track: null },
-            { key: 'navami',   label: 'Navami',         start: '2026-10-20T00:00:00+05:30', blurb: 'The final full day of worship.', track: null },
-            { key: 'dashami',  label: 'Vijaya Dashami',  start: '2026-10-21T00:00:00+05:30', blurb: 'Visarjan — the goddess returns home, until next year.', track: null }
+            { key: 'মহালয়া ',  label: 'মহালয়া ',      start: '2026-10-10T00:00:00+05:30', blurb: 'Today is মহালয়া ' },
+            { key: 'pratipada', label: 'Pratipada',     start: '2026-10-11T00:00:00+05:30', blurb: 'Day 1 of Devi Paksha.' },
+            { key: 'dwitiya',   label: 'Dwitiya',       start: '2026-10-12T00:00:00+05:30', blurb: 'Day 2 of Devi Paksha.' },
+            { key: 'tritiya',   label: 'Tritiya',       start: '2026-10-13T00:00:00+05:30', blurb: 'Day 3 of Devi Paksha.' },
+            { key: 'chaturthi', label: 'Chaturthi',     start: '2026-10-14T00:00:00+05:30', blurb: 'Day 4 of Devi Paksha.' },
+            { key: 'panchami',  label: 'Maha Panchami', start: '2026-10-15T00:00:00+05:30', blurb: 'Day 5 of Devi Paksha.' },
+            { key: 'shashthi',  label: 'Maha Shashthi', start: '2026-10-16T00:00:00+05:30', blurb: 'Bodhon — the goddess is ceremonially awakened.' },
+            { key: 'saptami',   label: 'Maha Saptami',  start: '2026-10-17T00:00:00+05:30', blurb: 'Nabapatrika Snan — the ceremonial bathing of nine sacred plants.' },
+            { key: 'ashtami',   label: 'Maha Ashtami',  start: '2026-10-19T00:00:00+05:30', blurb: 'The most significant day — Sandhi Puja at twilight.' },
+            { key: 'navami',    label: 'Maha Navami',   start: '2026-10-20T00:00:00+05:30', blurb: 'The final full day of worship.' },
+            { key: 'dashami',   label: 'Vijaya Dashami', start: '2026-10-21T00:00:00+05:30', end: '2026-10-22T00:00:00+05:30', blurb: 'Visarjan — the goddess returns home, until next year.' }
         ];
 
         function getPhaseStatus(phases, now) {
@@ -404,8 +483,14 @@
                 if (now < start) {
                     return { status: 'upcoming', phase: phases[i], target: start };
                 }
-                const windowEnd = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-                if (now < windowEnd) {
+                // A phase's window runs until the next phase starts (or its own
+                // explicit `end` for the last one) — with the full day-by-day
+                // list this chains cleanly with no gaps, and it's what lets
+                // Saptami's real two-day span "just work" with no special case.
+                const windowEnd = phases[i].end
+                    ? new Date(phases[i].end)
+                    : (i + 1 < phases.length ? new Date(phases[i + 1].start) : null);
+                if (!windowEnd || now < windowEnd) {
                     return { status: 'live', phase: phases[i] };
                 }
             }
@@ -433,10 +518,13 @@
         const cdMinutes = document.getElementById('cdMinutes');
         const cdSeconds = document.getElementById('cdSeconds');
 
-        const audioEl = document.getElementById('phaseAudio');
+        const audioEl = document.getElementById('phaseAudio'); // the playlist you browse manually
+        const themeAudioEl = document.getElementById('themeAudio'); // the ambient theme, plays on its own
         const trackTitleEl = document.getElementById('trackTitle');
         const trackArtistEl = document.getElementById('trackArtist');
         const playBtn = document.getElementById('playBtn');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
         const playIcon = document.getElementById('playIcon');
         const pauseIcon = document.getElementById('pauseIcon');
         const progressBar = document.getElementById('progressBar');
@@ -452,31 +540,159 @@
             return `${m}:${s}`;
         }
 
-        function updateMusicPanel(info) {
-            const track = info.phase && info.phase.track;
-            if (track) {
-                trackTitleEl.textContent = track.title || info.phase.label;
-                trackArtistEl.textContent = track.artist || '';
-                if (audioEl.dataset.loadedSrc !== track.src) {
-                    audioEl.pause();
-                    audioEl.src = track.src;
-                    audioEl.dataset.loadedSrc = track.src;
+        // Reads TITLE and ARTIST straight out of a FLAC file's VORBIS_COMMENT
+        // metadata block — no external library. Only requests the first 1MB
+        // (metadata always sits before the audio data). Needs the page served
+        // over http(s); opening the file directly via file:// usually blocks
+        // the fetch and titles fall back to the filename.
+        async function readFlacMetadata(url) {
+            try {
+                const res = await fetch(url, { headers: { Range: 'bytes=0-1048575' } });
+                if (!res.ok) throw new Error('Could not fetch audio file for tag reading');
+                const buf = await res.arrayBuffer();
+                const view = new DataView(buf);
+                if (view.getUint32(0, false) !== 0x664c6143) throw new Error('Not a FLAC file'); // "fLaC"
+
+                let offset = 4, isLast = false;
+                const tags = {};
+                while (!isLast && offset + 4 <= buf.byteLength) {
+                    const headerByte = view.getUint8(offset);
+                    isLast = (headerByte & 0x80) !== 0;
+                    const blockType = headerByte & 0x7f;
+                    const blockLength = (view.getUint8(offset + 1) << 16) | (view.getUint8(offset + 2) << 8) | view.getUint8(offset + 3);
+                    const blockStart = offset + 4;
+                    if (blockType === 4) { // VORBIS_COMMENT
+                        let p = blockStart;
+                        const vendorLength = view.getUint32(p, true); p += 4 + vendorLength;
+                        const commentCount = view.getUint32(p, true); p += 4;
+                        for (let i = 0; i < commentCount && p < buf.byteLength; i++) {
+                            const len = view.getUint32(p, true); p += 4;
+                            const bytes = new Uint8Array(buf, p, len);
+                            const pair = new TextDecoder('utf-8').decode(bytes);
+                            p += len;
+                            const eq = pair.indexOf('=');
+                            if (eq > -1) tags[pair.slice(0, eq).toUpperCase()] = pair.slice(eq + 1);
+                        }
+                        break;
+                    }
+                    offset = blockStart + blockLength;
                 }
-                playBtn.disabled = false;
-                progressBar.disabled = false;
-            } else {
-                trackTitleEl.textContent = info.phase ? info.phase.label : 'Dugga Pujo';
-                trackArtistEl.textContent = 'No track set yet';
+                return { title: tags.TITLE || null, artist: tags.ARTIST || null };
+            } catch (err) {
+                console.warn('FLAC metadata read failed:', url, err.message);
+                return { title: null, artist: null };
+            }
+        }
+
+        // ===================================================================
+        // Theme + Playlist audio
+        // ===================================================================
+        // File convention per phase key: {key}1.flac = ambient theme (not in
+        // the playlist), {key}2.flac..{key}10.flac = regular playlist tracks.
+        // Whichever files actually exist get used — nothing breaks if most
+        // slots aren't uploaded yet.
+
+        function probeFileExists(url) {
+            return fetch(url, { method: 'HEAD' }).then(res => res.ok).catch(() => false);
+        }
+
+        async function buildPhaseAudio(phaseKey) {
+            const themeUrl = `${phaseKey}1.flac`;
+            const themeExists = await probeFileExists(themeUrl);
+
+            const candidateUrls = [];
+            for (let i = 2; i <= 10; i++) candidateUrls.push(`${phaseKey}${i}.flac`);
+            const checks = await Promise.all(candidateUrls.map(async (url) => (await probeFileExists(url)) ? url : null));
+
+            return { theme: themeExists ? themeUrl : null, playlist: checks.filter(Boolean) };
+        }
+
+        let userInteracted = false;
+        let phaseAudioPromise = null;
+        let currentPlaylist = [];
+        let currentTrackIndex = 0;
+        let currentPhaseKeyForAudio = null;
+
+        function fadeInTheme(targetVolume = 0.3, duration = 3000) {
+            if (!themeAudioEl.src) return;
+            themeAudioEl.volume = 0;
+            themeAudioEl.play().catch(() => {});
+            const steps = 30;
+            const stepMs = duration / steps;
+            let step = 0;
+            const timer = setInterval(() => {
+                step++;
+                themeAudioEl.volume = Math.min(targetVolume, (targetVolume * step) / steps);
+                if (step >= steps) clearInterval(timer);
+            }, stepMs);
+        }
+        function pauseTheme() { themeAudioEl.pause(); }
+
+        function updatePlaylistUI() {
+            const hasTracks = currentPlaylist.length > 0;
+            playBtn.disabled = !hasTracks;
+            prevBtn.disabled = !hasTracks;
+            nextBtn.disabled = !hasTracks;
+            progressBar.disabled = !hasTracks;
+            if (!hasTracks) {
+                setLocalizedText(trackTitleEl, 'No tracks yet');
+                trackArtistEl.textContent = '';
+                trackArtistEl.removeAttribute('lang');
                 audioEl.pause();
                 audioEl.removeAttribute('src');
-                delete audioEl.dataset.loadedSrc;
-                playBtn.disabled = true;
-                progressBar.disabled = true;
                 progressBar.value = 0;
                 currentTimeLabel.textContent = '0:00';
                 durationLabel.textContent = '0:00';
             }
         }
+
+        async function loadPlaylistTrack(index, autoPlay) {
+            if (!currentPlaylist.length) return;
+            currentTrackIndex = ((index % currentPlaylist.length) + currentPlaylist.length) % currentPlaylist.length;
+            const src = currentPlaylist[currentTrackIndex];
+
+            setLocalizedText(trackTitleEl, 'Loading…');
+            trackArtistEl.textContent = '\u00A0';
+            trackArtistEl.removeAttribute('lang');
+
+            audioEl.src = src;
+            if (autoPlay) audioEl.play().catch(() => {});
+
+            const meta = await readFlacMetadata(src);
+            setLocalizedText(trackTitleEl, meta.title || src);
+            setLocalizedText(trackArtistEl, meta.artist || '');
+        }
+
+        async function setupPhaseAudio(phaseKey) {
+            if (phaseKey === currentPhaseKeyForAudio) return; // nothing changed since last check
+            currentPhaseKeyForAudio = phaseKey;
+
+            audioEl.pause();
+            pauseTheme();
+            currentPlaylist = [];
+            currentTrackIndex = 0;
+            updatePlaylistUI();
+
+            phaseAudioPromise = buildPhaseAudio(phaseKey);
+            const result = await phaseAudioPromise;
+
+            themeAudioEl.src = result.theme || '';
+            currentPlaylist = result.playlist;
+            updatePlaylistUI();
+
+            if (userInteracted && result.theme && audioEl.paused) fadeInTheme();
+        }
+
+        async function tryStartTheme() {
+            if (userInteracted) return;
+            userInteracted = true;
+            if (phaseAudioPromise) {
+                const result = await phaseAudioPromise;
+                if (result.theme && audioEl.paused) fadeInTheme();
+            }
+        }
+        document.addEventListener('click', tryStartTheme, { once: true });
+        document.addEventListener('touchstart', tryStartTheme, { once: true });
 
         // Bengali script sits in one contiguous Unicode block (U+0980–U+09FF),
         // so this catches any Bangla text regardless of which phase it's in —
@@ -490,6 +706,145 @@
             }
         }
 
+        // One-time sweep for anything typed directly into the static HTML
+        // (like the <h1>) rather than set by the JS above — so editing the
+        // heading (or anything else) straight in the markup just works too,
+        // with nothing to remember to tag by hand. Skips <script>/<style>
+        // since their raw text isn't visible page content.
+        function autoTagBanglaText(root) {
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    const tag = node.parentElement && node.parentElement.tagName;
+                    if (tag === 'SCRIPT' || tag === 'STYLE') return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            let node;
+            while ((node = walker.nextNode())) {
+                if (node.parentElement && /[\u0980-\u09FF]/.test(node.textContent)) {
+                    node.parentElement.setAttribute('lang', 'bn');
+                }
+            }
+        }
+        autoTagBanglaText(document.body);
+
+        // ===================================================================
+        // Background images — time of day (Kolkata) × festival phase
+        // ===================================================================
+        // Two independent things: what time bucket it is right now in
+        // Kolkata, and whether today has its own individual art, shares the
+        // general festival art, or falls outside the festival window
+        // entirely. Whichever files actually exist get used — nothing
+        // breaks if most slots are still empty.
+        //
+        // File naming:
+        //   Default (outside the festival window): bg-morning.jpg, bg-day.jpg, bg-night.jpg
+        //   Shared festival (any day মহালয়া –Dashami):  bg-pujo-morning.jpg, bg-pujo-day.jpg, bg-pujo-night.jpg
+        //   Individual per-day override:  bg-{phaseKey}-morning.jpg, e.g. bg-মহালয়া -morning.jpg, bg-shashthi-night.jpg
+        // For any given moment, the individual file is tried first, then
+        // the shared festival file, then the default — first one that
+        // actually loads wins.
+
+        function getKolkataHour() {
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false
+            }).formatToParts(new Date());
+            const hourPart = parts.find(p => p.type === 'hour').value;
+            return parseInt(hourPart, 10) % 24; // "24" at midnight in some locales — wrap it to 0
+        }
+
+        function getTimeOfDay() {
+            const h = getKolkataHour();
+            if (h >= 5 && h < 11) return 'morning';
+            if (h >= 11 && h < 17) return 'day';
+            return 'night';
+        }
+
+        function getBackgroundCandidates(info, timeOfDay) {
+            if (info.status === 'live') {
+                return [
+                    `bg-${info.phase.key}-${timeOfDay}.jpg`,
+                    `bg-pujo-${timeOfDay}.jpg`,
+                    `bg-${timeOfDay}.jpg`
+                ];
+            }
+            return [`bg-${timeOfDay}.jpg`];
+        }
+
+        function tryLoadImage(url) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => resolve(url);
+                img.onerror = () => resolve(null);
+                img.src = url;
+            });
+        }
+
+        // Checked in priority order, not in parallel — we want the first
+        // one that exists, not just whichever happens to respond first.
+        async function pickFirstAvailableImage(candidates) {
+            for (const url of candidates) {
+                const result = await tryLoadImage(url);
+                if (result) return result;
+            }
+            return null;
+        }
+
+        function applyBackgroundImage(url) {
+            const bgEl = document.querySelector('.bg-container');
+            if (bgEl.dataset.currentBg === url) return;
+            bgEl.style.opacity = '0';
+            setTimeout(() => {
+                bgEl.style.backgroundImage = `url('${url}')`;
+                bgEl.dataset.currentBg = url;
+                bgEl.style.opacity = '1';
+            }, 400);
+        }
+
+        let lastBgKey = null;
+        async function refreshBackground(info) {
+            const timeOfDay = getTimeOfDay();
+            const seasonKey = info.status === 'live' ? info.phase.key : 'default';
+            const bgKey = `${seasonKey}:${timeOfDay}`;
+            if (bgKey === lastBgKey) return; // nothing relevant has changed since last check
+            lastBgKey = bgKey;
+
+            const winner = await pickFirstAvailableImage(getBackgroundCandidates(info, timeOfDay));
+            if (winner) {
+                applyBackgroundImage(winner);
+            } else {
+                const bgEl = document.querySelector('.bg-container');
+                if (!bgEl.dataset.currentBg) bgEl.style.background = '#1a1410';
+            }
+        }
+
+        // ---- Collapsible countdown ----
+        // Starts expanded (the countdown is the page's main point); collapsing
+        // reveals more of the background photo, with the pill keeping the
+        // essentials visible.
+        const countdownCardEl = document.getElementById('countdownCard');
+        const countdownPillEl = document.getElementById('countdownPill');
+        const collapseBtn = document.getElementById('collapseBtn');
+        let countdownExpanded = true;
+
+        function setCountdownExpanded(expanded) {
+            countdownExpanded = expanded;
+            countdownCardEl.style.display = expanded ? 'block' : 'none';
+            countdownPillEl.style.display = expanded ? 'none' : 'flex';
+        }
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setCountdownExpanded(false);
+        });
+        countdownPillEl.addEventListener('click', () => setCountdownExpanded(true));
+
+        function formatPillText(info, now) {
+            if (info.status === 'live') return `আজ ${info.phase.label}`;
+            if (info.status === 'over') return 'Pujo is over — see you next year!';
+            const parts = splitCountdown(info.target - now);
+            return `${info.phase.label} · ${parts.days}d ${parts.hours}h ${parts.minutes}m`;
+        }
+
         function renderPhase() {
             const now = new Date();
             const info = getPhaseStatus(DUGGA_PUJO_PHASES, now);
@@ -497,8 +852,9 @@
             if (info.status === 'upcoming') {
                 phaseLabelEl.textContent = 'Counting down to';
                 setLocalizedText(phaseNameEl, info.phase.label);
-                setLocalizedText(phaseBlurbEl, info.phase.blurb);
-                setLocalizedText(subheadingEl, `${info.phase.label} is on its way`);
+                phaseBlurbEl.textContent = ''; // phase.blurb is a live-day claim ("Today is মহালয়া ") — wrong to show while still counting down
+                phaseBlurbEl.removeAttribute('lang');
+                setLocalizedText(subheadingEl, `${info.phase.label} অপেক্ষা`);
                 countdownGridEl.style.display = 'flex';
 
                 const parts = splitCountdown(info.target - now);
@@ -514,13 +870,15 @@
                 countdownGridEl.style.display = 'none';
             } else {
                 phaseLabelEl.textContent = "That's a wrap";
-                setLocalizedText(phaseNameEl, 'Dugga Pujo');
-                setLocalizedText(phaseBlurbEl, "Until next year — update DUGGA_PUJO_PHASES with next year's dates once they're announced.");
+                setLocalizedText(phaseNameEl, 'Pujo is over');
+                setLocalizedText(phaseBlurbEl, 'See you next year!');
                 setLocalizedText(subheadingEl, 'See you next year 🪔');
                 countdownGridEl.style.display = 'none';
             }
 
-            updateMusicPanel(info);
+            setupPhaseAudio(info.phase.key);
+            refreshBackground(info);
+            setLocalizedText(countdownPillEl, formatPillText(info, now));
         }
 
         renderPhase();
@@ -546,21 +904,43 @@
 
         // ---- Playback ----
         playBtn.addEventListener('click', () => {
-            if (!audioEl.src) return;
-            if (audioEl.paused) audioEl.play().catch(() => {});
-            else audioEl.pause();
+            if (!currentPlaylist.length) return;
+            if (!audioEl.src) {
+                loadPlaylistTrack(0, true);
+            } else if (audioEl.paused) {
+                audioEl.play().catch(() => {});
+            } else {
+                audioEl.pause();
+                if (userInteracted) fadeInTheme(); // explicit stop -> bring the ambient theme back
+            }
+        });
+        prevBtn.addEventListener('click', () => {
+            loadPlaylistTrack(currentTrackIndex - 1, !audioEl.paused);
+        });
+        nextBtn.addEventListener('click', () => {
+            loadPlaylistTrack(currentTrackIndex + 1, !audioEl.paused);
         });
         audioEl.addEventListener('play', () => {
             playIcon.style.display = 'none';
             pauseIcon.style.display = '';
             playBtn.setAttribute('aria-label', 'Pause');
             icon.classList.add('playing');
+            pauseTheme(); // any playlist playback (manual or auto-advance) ducks the theme
         });
         audioEl.addEventListener('pause', () => {
             playIcon.style.display = '';
             pauseIcon.style.display = 'none';
             playBtn.setAttribute('aria-label', 'Play');
             icon.classList.remove('playing');
+        });
+        audioEl.addEventListener('ended', () => {
+            if (!currentPlaylist.length) return;
+            const nextIndex = currentTrackIndex + 1;
+            if (nextIndex < currentPlaylist.length) {
+                loadPlaylistTrack(nextIndex, true);
+            } else if (userInteracted) {
+                fadeInTheme(); // reached the end of the playlist -> bring the ambient theme back
+            }
         });
         audioEl.addEventListener('loadedmetadata', () => {
             durationLabel.textContent = formatTime(audioEl.duration);
