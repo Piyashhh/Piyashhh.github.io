@@ -243,11 +243,106 @@
             50% { box-shadow: 0 8px 24px rgba(0,0,0,0.35), 0 0 0 9px rgba(255,205,140,0); }
         }
 
-        .player-panel {
+        /* Wrapper for everything that appears when the player expands —
+           tabs + panel stack in normal flow here, so the tabs sit "above"
+           the panel automatically regardless of the panel's actual height. */
+        .player-expanded-content {
             position: absolute;
             bottom: 68px;
             right: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            transform-origin: bottom right;
+            transform: scale(0.85);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;
+        }
+        .player-widget.expanded .player-expanded-content {
+            transform: scale(1); opacity: 1; pointer-events: auto;
+        }
+
+        /* Playlist tabs + view-playlist button — combined width matches the
+           player panel exactly, so the whole stack reads as one unit. */
+        .playlist-tabs {
+            display: flex;
+            gap: 6px;
             width: min(280px, calc(100vw - 48px));
+        }
+        .tab-btn {
+            flex: 1;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 200, 140, 0.2);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 7px 4px;
+            border-radius: 12px;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tab-btn.active {
+            background: rgba(255, 200, 140, 0.25);
+            color: #fff;
+            border-color: rgba(255, 200, 140, 0.4);
+        }
+        .view-playlist-btn {
+            flex: 0 0 32px;
+            width: 32px; height: 32px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 200, 140, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            padding: 0;
+        }
+        .view-playlist-btn svg {
+            width: 14px; height: 14px;
+            fill: none; stroke: #fff; stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+
+        /* Track list — toggled open by the view-playlist button */
+        .track-list {
+            display: none;
+            max-height: 160px;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .track-list.open { display: block; }
+        .track-list-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.78rem;
+            padding: 7px 4px;
+            border-radius: 8px;
+            cursor: pointer;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .track-list-item.current {
+            color: #fff;
+            font-weight: 600;
+            background: rgba(255, 200, 140, 0.15);
+        }
+        .track-list-empty {
+            font-size: 0.78rem;
+            color: rgba(255, 255, 255, 0.5);
+            padding: 4px;
+        }
+
+        .player-panel {
             background: rgba(255, 255, 255, 0.09);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
@@ -255,14 +350,7 @@
             border-radius: 20px;
             padding: 18px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
-            transform-origin: bottom right;
-            transform: scale(0.85);
-            opacity: 0;
-            pointer-events: none;
-            transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;
-        }
-        .player-widget.expanded .player-panel {
-            transform: scale(1); opacity: 1; pointer-events: auto;
+            width: min(280px, calc(100vw - 48px));
         }
 
         .track-title {
@@ -314,7 +402,7 @@
         .play-btn svg { width: 16px; height: 16px; }
 
         @media (prefers-reduced-motion: reduce) {
-            .player-panel { transform: none; transition: opacity 0.15s ease; }
+            .player-expanded-content { transform: none; transition: opacity 0.15s ease; }
             .player-icon.playing { animation: none; }
         }
     </style>
@@ -351,29 +439,42 @@
 
     <button type="button" class="countdown-pill" id="countdownPill" aria-label="Expand countdown"></button>
 
-    <!-- Music widget — ambient theme (auto) + a per-day playlist you browse manually -->
+    <!-- Music widget — ambient theme (auto, pre-Mahalaya only) + three browsable playlists -->
     <div class="player-widget" id="playerWidget">
-        <div class="player-panel" id="playerPanel">
-            <div class="track-title" id="trackTitle">—</div>
-            <div class="track-artist" id="trackArtist">—</div>
-
-            <div class="progress-row">
-                <span class="time-label" id="currentTimeLabel">0:00</span>
-                <input type="range" class="progress-bar" id="progressBar" min="0" max="100" step="0.1" value="0" aria-label="Seek" disabled>
-                <span class="time-label end" id="durationLabel">0:00</span>
+        <div class="player-expanded-content">
+            <div class="playlist-tabs" id="playlistTabs">
+                <button type="button" class="tab-btn" data-bucket="agomoni">Agomoni</button>
+                <button type="button" class="tab-btn" data-bucket="mahalaya">Mahalaya</button>
+                <button type="button" class="tab-btn" data-bucket="pujo">Pujo</button>
+                <button type="button" class="view-playlist-btn" id="viewPlaylistBtn" aria-label="View playlist">
+                    <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
+                </button>
             </div>
 
-            <div class="controls-row">
-                <button type="button" class="play-btn" id="prevBtn" aria-label="Previous track" disabled style="margin-right: 12px; width: 36px; height: 36px;">
-                    <svg viewBox="0 0 24 24" fill="#fff"><path d="M18 6l-8.5 6 8.5 6V6zM8 6v12h-2V6h2z"/></svg>
-                </button>
-                <button type="button" class="play-btn" id="playBtn" aria-label="Play" disabled>
-                    <svg id="playIcon" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
-                    <svg id="pauseIcon" viewBox="0 0 24 24" fill="#fff" style="display:none;"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
-                </button>
-                <button type="button" class="play-btn" id="nextBtn" aria-label="Next track" disabled style="margin-left: 12px; width: 36px; height: 36px;">
-                    <svg viewBox="0 0 24 24" fill="#fff"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
-                </button>
+            <div class="player-panel" id="playerPanel">
+                <div class="track-title" id="trackTitle">—</div>
+                <div class="track-artist" id="trackArtist">—</div>
+
+                <div class="progress-row">
+                    <span class="time-label" id="currentTimeLabel">0:00</span>
+                    <input type="range" class="progress-bar" id="progressBar" min="0" max="100" step="0.1" value="0" aria-label="Seek" disabled>
+                    <span class="time-label end" id="durationLabel">0:00</span>
+                </div>
+
+                <div class="controls-row">
+                    <button type="button" class="play-btn" id="prevBtn" aria-label="Previous track" disabled style="margin-right: 12px; width: 36px; height: 36px;">
+                        <svg viewBox="0 0 24 24" fill="#fff"><path d="M18 6l-8.5 6 8.5 6V6zM8 6v12h-2V6h2z"/></svg>
+                    </button>
+                    <button type="button" class="play-btn" id="playBtn" aria-label="Play" disabled>
+                        <svg id="playIcon" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z"/></svg>
+                        <svg id="pauseIcon" viewBox="0 0 24 24" fill="#fff" style="display:none;"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+                    </button>
+                    <button type="button" class="play-btn" id="nextBtn" aria-label="Next track" disabled style="margin-left: 12px; width: 36px; height: 36px;">
+                        <svg viewBox="0 0 24 24" fill="#fff"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                    </button>
+                </div>
+
+                <div class="track-list" id="trackList"></div>
             </div>
         </div>
 
@@ -385,7 +486,7 @@
 
     <!-- Playlist track playback -->
     <audio id="phaseAudio" preload="none"></audio>
-    <!-- Ambient theme — separate element so it can duck under the playlist independently -->
+    <!-- Ambient theme — plays until Mahalaya, separate element so it can duck under the playlist independently -->
     <audio id="themeAudio" preload="none"></audio>
 
     <script>
@@ -460,11 +561,8 @@
         //
         // Update every year — Durga Puja follows the lunisolar calendar,
         // so these dates shift annually.
-        //
-        // Add a track once you have one, e.g.:
-        //   track: { src: 'মহালয়া.mp3', title: 'মহালয়া  Dawn', artist: 'Your name' }
         const DUGGA_PUJO_PHASES = [
-            { key: 'মহালয়া ',  label: 'মহালয়া ',      start: '2026-10-10T00:00:00+05:30', blurb: 'Today is মহালয়া ' },
+            { key: 'mahalaya',  label: 'মহালয়া',       start: '2026-10-10T00:00:00+05:30', blurb: 'Today is মহালয়া' },
             { key: 'pratipada', label: 'Pratipada',     start: '2026-10-11T00:00:00+05:30', blurb: 'Day 1 of Devi Paksha.' },
             { key: 'dwitiya',   label: 'Dwitiya',       start: '2026-10-12T00:00:00+05:30', blurb: 'Day 2 of Devi Paksha.' },
             { key: 'tritiya',   label: 'Tritiya',       start: '2026-10-13T00:00:00+05:30', blurb: 'Day 3 of Devi Paksha.' },
@@ -483,10 +581,6 @@
                 if (now < start) {
                     return { status: 'upcoming', phase: phases[i], target: start };
                 }
-                // A phase's window runs until the next phase starts (or its own
-                // explicit `end` for the last one) — with the full day-by-day
-                // list this chains cleanly with no gaps, and it's what lets
-                // Saptami's real two-day span "just work" with no special case.
                 const windowEnd = phases[i].end
                     ? new Date(phases[i].end)
                     : (i + 1 < phases.length ? new Date(phases[i + 1].start) : null);
@@ -522,6 +616,8 @@
         const themeAudioEl = document.getElementById('themeAudio'); // the ambient theme, plays on its own
         const trackTitleEl = document.getElementById('trackTitle');
         const trackArtistEl = document.getElementById('trackArtist');
+        const viewPlaylistBtn = document.getElementById('viewPlaylistBtn');
+        const trackListEl = document.getElementById('trackList');
         const playBtn = document.getElementById('playBtn');
         const prevBtn = document.getElementById('prevBtn');
         const nextBtn = document.getElementById('nextBtn');
@@ -540,78 +636,59 @@
             return `${m}:${s}`;
         }
 
-        // Reads TITLE and ARTIST straight out of a FLAC file's VORBIS_COMMENT
-        // metadata block — no external library. Only requests the first 1MB
-        // (metadata always sits before the audio data). Needs the page served
-        // over http(s); opening the file directly via file:// usually blocks
-        // the fetch and titles fall back to the filename.
-        async function readFlacMetadata(url) {
-            try {
-                const res = await fetch(url, { headers: { Range: 'bytes=0-1048575' } });
-                if (!res.ok) throw new Error('Could not fetch audio file for tag reading');
-                const buf = await res.arrayBuffer();
-                const view = new DataView(buf);
-                if (view.getUint32(0, false) !== 0x664c6143) throw new Error('Not a FLAC file'); // "fLaC"
-
-                let offset = 4, isLast = false;
-                const tags = {};
-                while (!isLast && offset + 4 <= buf.byteLength) {
-                    const headerByte = view.getUint8(offset);
-                    isLast = (headerByte & 0x80) !== 0;
-                    const blockType = headerByte & 0x7f;
-                    const blockLength = (view.getUint8(offset + 1) << 16) | (view.getUint8(offset + 2) << 8) | view.getUint8(offset + 3);
-                    const blockStart = offset + 4;
-                    if (blockType === 4) { // VORBIS_COMMENT
-                        let p = blockStart;
-                        const vendorLength = view.getUint32(p, true); p += 4 + vendorLength;
-                        const commentCount = view.getUint32(p, true); p += 4;
-                        for (let i = 0; i < commentCount && p < buf.byteLength; i++) {
-                            const len = view.getUint32(p, true); p += 4;
-                            const bytes = new Uint8Array(buf, p, len);
-                            const pair = new TextDecoder('utf-8').decode(bytes);
-                            p += len;
-                            const eq = pair.indexOf('=');
-                            if (eq > -1) tags[pair.slice(0, eq).toUpperCase()] = pair.slice(eq + 1);
-                        }
-                        break;
-                    }
-                    offset = blockStart + blockLength;
-                }
-                return { title: tags.TITLE || null, artist: tags.ARTIST || null };
-            } catch (err) {
-                console.warn('FLAC metadata read failed:', url, err.message);
-                return { title: null, artist: null };
-            }
+        // MP3 tagging (ID3) is a meaningfully different, messier binary format
+        // than FLAC's — versions vary (v2.2/2.3/2.4), text encodings vary, and
+        // I can't test a hand-rolled parser against real-world files here.
+        // Simpler and more reliable: derive the shown title from the filename
+        // itself. Name your files however you want them to display —
+        // hyphens/underscores become spaces and it's title-cased.
+        function titleFromFilename(url) {
+            const base = url.split('/').pop().replace(/\.[^.]+$/, '');
+            return base
+                .replace(/[-_]+/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase());
         }
 
         // ===================================================================
-        // Theme + Playlist audio
+        // Theme + Playlists
         // ===================================================================
-        // File convention per phase key: মহালয়া.mp3 = ambient theme (not in
-        // the playlist), {key}2.flac..{key}10.flac = regular playlist tracks.
-        // Whichever files actually exist get used — nothing breaks if most
-        // slots aren't uploaded yet.
+        // Four fixed buckets instead of one per named day:
+        //   theme.mp3                        — ambient, auto-plays, plays until Mahalaya, not browsable
+        //   agomoni1.mp3 .. agomoni10.mp3     — playlist for the pre-Mahalaya countdown
+        //   mahalaya1.mp3 .. mahalaya10.mp3   — playlist for Mahalaya day itself
+        //   pujo1.mp3 .. pujo10.mp3           — playlist for every day after Mahalaya through Dashami
+        // Whichever numbered files actually exist get used — nothing breaks
+        // if most slots aren't uploaded yet.
+        const PLAYLIST_BUCKETS = ['agomoni', 'mahalaya', 'pujo'];
 
         function probeFileExists(url) {
             return fetch(url, { method: 'HEAD' }).then(res => res.ok).catch(() => false);
         }
 
-        async function buildPhaseAudio(phaseKey) {
-            const themeUrl = `${phaseKey}1.flac`;
-            const themeExists = await probeFileExists(themeUrl);
-
+        async function buildBucketPlaylist(bucket) {
             const candidateUrls = [];
-            for (let i = 2; i <= 10; i++) candidateUrls.push(`${phaseKey}${i}.flac`);
+            for (let i = 1; i <= 10; i++) candidateUrls.push(`${bucket}${i}.mp3`);
             const checks = await Promise.all(candidateUrls.map(async (url) => (await probeFileExists(url)) ? url : null));
+            return checks.filter(Boolean);
+        }
 
-            return { theme: themeExists ? themeUrl : null, playlist: checks.filter(Boolean) };
+        // Which bucket the current moment points to by default — the user can
+        // still manually flip to a different tab; this only decides what's
+        // pre-selected and when the ambient theme is eligible to play.
+        function getDefaultBucket(info) {
+            if (info.status === 'upcoming') return 'agomoni';
+            if (info.status === 'live' && info.phase.key === 'mahalaya') return 'mahalaya';
+            if (info.status === 'live') return 'pujo';
+            return null; // 'over' — nothing plays
         }
 
         let userInteracted = false;
-        let phaseAudioPromise = null;
+        let themeUrlPromise = null; // resolves once, doesn't need re-probing per phase
+        let currentBucket = null;
+        let userPickedBucket = false; // once true, stop auto-switching tabs on phase change
         let currentPlaylist = [];
         let currentTrackIndex = 0;
-        let currentPhaseKeyForAudio = null;
+        let bucketCache = {}; // bucket name -> resolved playlist, so re-visiting a tab doesn't re-probe
 
         function fadeInTheme(targetVolume = 0.3, duration = 3000) {
             if (!themeAudioEl.src) return;
@@ -627,6 +704,11 @@
             }, stepMs);
         }
         function pauseTheme() { themeAudioEl.pause(); }
+        function resumeThemeIfEligible() {
+            if (!userInteracted) return;
+            const info = getPhaseStatus(DUGGA_PUJO_PHASES, new Date());
+            if (info.status === 'upcoming') fadeInTheme();
+        }
 
         function updatePlaylistUI() {
             const hasTracks = currentPlaylist.length > 0;
@@ -644,59 +726,117 @@
                 currentTimeLabel.textContent = '0:00';
                 durationLabel.textContent = '0:00';
             }
+            renderTrackList();
         }
 
-        async function loadPlaylistTrack(index, autoPlay) {
+        function renderTrackList() {
+            trackListEl.innerHTML = '';
+            if (!currentPlaylist.length) {
+                const empty = document.createElement('div');
+                empty.className = 'track-list-empty';
+                empty.textContent = 'No tracks in this playlist yet.';
+                trackListEl.appendChild(empty);
+                return;
+            }
+            currentPlaylist.forEach((src, i) => {
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'track-list-item' + (i === currentTrackIndex ? ' current' : '');
+                item.textContent = titleFromFilename(src);
+                item.addEventListener('click', () => loadPlaylistTrack(i, true));
+                trackListEl.appendChild(item);
+            });
+        }
+
+        function loadPlaylistTrack(index, autoPlay) {
             if (!currentPlaylist.length) return;
             currentTrackIndex = ((index % currentPlaylist.length) + currentPlaylist.length) % currentPlaylist.length;
             const src = currentPlaylist[currentTrackIndex];
 
-            setLocalizedText(trackTitleEl, 'Loading…');
+            setLocalizedText(trackTitleEl, titleFromFilename(src));
             trackArtistEl.textContent = '\u00A0';
             trackArtistEl.removeAttribute('lang');
 
             audioEl.src = src;
             if (autoPlay) audioEl.play().catch(() => {});
-
-            const meta = await readFlacMetadata(src);
-            setLocalizedText(trackTitleEl, meta.title || src);
-            setLocalizedText(trackArtistEl, meta.artist || '');
+            renderTrackList();
         }
 
-        async function setupPhaseAudio(phaseKey) {
-            if (phaseKey === currentPhaseKeyForAudio) return; // nothing changed since last check
-            currentPhaseKeyForAudio = phaseKey;
+        function setActiveTab(bucket) {
+            document.querySelectorAll('.tab-btn').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.bucket === bucket);
+            });
+        }
 
+        async function switchToBucket(bucket) {
+            currentBucket = bucket;
+            setActiveTab(bucket);
             audioEl.pause();
-            pauseTheme();
-            currentPlaylist = [];
             currentTrackIndex = 0;
+
+            if (bucketCache[bucket]) {
+                currentPlaylist = bucketCache[bucket];
+                updatePlaylistUI();
+                return;
+            }
+            currentPlaylist = [];
             updatePlaylistUI();
+            const playlist = await buildBucketPlaylist(bucket);
+            bucketCache[bucket] = playlist;
+            if (currentBucket === bucket) { // user might have tabbed away while this was loading
+                currentPlaylist = playlist;
+                updatePlaylistUI();
+            }
+        }
 
-            phaseAudioPromise = buildPhaseAudio(phaseKey);
-            const result = await phaseAudioPromise;
+        document.querySelectorAll('.tab-btn').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                userPickedBucket = true;
+                switchToBucket(btn.dataset.bucket);
+            });
+        });
 
-            themeAudioEl.src = result.theme || '';
-            currentPlaylist = result.playlist;
-            updatePlaylistUI();
+        viewPlaylistBtn.addEventListener('click', () => {
+            trackListEl.classList.toggle('open');
+        });
 
-            if (userInteracted && result.theme && audioEl.paused) fadeInTheme();
+        async function ensureThemeLoaded() {
+            if (themeUrlPromise) return themeUrlPromise;
+            themeUrlPromise = probeFileExists('theme.mp3').then((exists) => exists ? 'theme.mp3' : null);
+            const url = await themeUrlPromise;
+            themeAudioEl.src = url || '';
+            return url;
+        }
+
+        // Called every render tick; only actually acts the first time and on
+        // real bucket-default changes, everything else is cheap no-ops.
+        async function updateAudioForPhase(info) {
+            const themeUrl = await ensureThemeLoaded();
+            const stillUpcoming = info.status === 'upcoming';
+
+            if (!userPickedBucket) {
+                const def = getDefaultBucket(info);
+                if (def && def !== currentBucket) switchToBucket(def);
+            }
+
+            if (userInteracted && stillUpcoming && themeUrl && audioEl.paused) {
+                fadeInTheme();
+            }
+            if (!stillUpcoming) {
+                pauseTheme(); // theme only ever belongs to the pre-Mahalaya wait
+            }
         }
 
         async function tryStartTheme() {
             if (userInteracted) return;
             userInteracted = true;
-            if (phaseAudioPromise) {
-                const result = await phaseAudioPromise;
-                if (result.theme && audioEl.paused) fadeInTheme();
-            }
+            const themeUrl = await ensureThemeLoaded();
+            const info = getPhaseStatus(DUGGA_PUJO_PHASES, new Date());
+            if (themeUrl && info.status === 'upcoming' && audioEl.paused) fadeInTheme();
         }
         document.addEventListener('click', tryStartTheme, { once: true });
         document.addEventListener('touchstart', tryStartTheme, { once: true });
 
-        // Bengali script sits in one contiguous Unicode block (U+0980–U+09FF),
-        // so this catches any Bangla text regardless of which phase it's in —
-        // no need to hand-flag each phase as English or Bangla.
         function setLocalizedText(el, text) {
             el.textContent = text;
             if (/[\u0980-\u09FF]/.test(text)) {
@@ -706,11 +846,6 @@
             }
         }
 
-        // One-time sweep for anything typed directly into the static HTML
-        // (like the <h1>) rather than set by the JS above — so editing the
-        // heading (or anything else) straight in the markup just works too,
-        // with nothing to remember to tag by hand. Skips <script>/<style>
-        // since their raw text isn't visible page content.
         function autoTagBanglaText(root) {
             const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
                 acceptNode(node) {
@@ -728,29 +863,12 @@
         }
         autoTagBanglaText(document.body);
 
-        // ===================================================================
-        // Background images — time of day (Kolkata) × festival phase
-        // ===================================================================
-        // Two independent things: what time bucket it is right now in
-        // Kolkata, and whether today has its own individual art, shares the
-        // general festival art, or falls outside the festival window
-        // entirely. Whichever files actually exist get used — nothing
-        // breaks if most slots are still empty.
-        //
-        // File naming:
-        //   Default (outside the festival window): bg-morning.jpg, bg-day.jpg, bg-night.jpg
-        //   Shared festival (any day মহালয়া –Dashami):  bg-pujo-morning.jpg, bg-pujo-day.jpg, bg-pujo-night.jpg
-        //   Individual per-day override:  bg-{phaseKey}-morning.jpg, e.g. bg-মহালয়া -morning.jpg, bg-shashthi-night.jpg
-        // For any given moment, the individual file is tried first, then
-        // the shared festival file, then the default — first one that
-        // actually loads wins.
-
         function getKolkataHour() {
             const parts = new Intl.DateTimeFormat('en-US', {
                 timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: false
             }).formatToParts(new Date());
             const hourPart = parts.find(p => p.type === 'hour').value;
-            return parseInt(hourPart, 10) % 24; // "24" at midnight in some locales — wrap it to 0
+            return parseInt(hourPart, 10) % 24;
         }
 
         function getTimeOfDay() {
@@ -780,8 +898,6 @@
             });
         }
 
-        // Checked in priority order, not in parallel — we want the first
-        // one that exists, not just whichever happens to respond first.
         async function pickFirstAvailableImage(candidates) {
             for (const url of candidates) {
                 const result = await tryLoadImage(url);
@@ -806,7 +922,7 @@
             const timeOfDay = getTimeOfDay();
             const seasonKey = info.status === 'live' ? info.phase.key : 'default';
             const bgKey = `${seasonKey}:${timeOfDay}`;
-            if (bgKey === lastBgKey) return; // nothing relevant has changed since last check
+            if (bgKey === lastBgKey) return;
             lastBgKey = bgKey;
 
             const winner = await pickFirstAvailableImage(getBackgroundCandidates(info, timeOfDay));
@@ -818,10 +934,6 @@
             }
         }
 
-        // ---- Collapsible countdown ----
-        // Starts expanded (the countdown is the page's main point); collapsing
-        // reveals more of the background photo, with the pill keeping the
-        // essentials visible.
         const countdownCardEl = document.getElementById('countdownCard');
         const countdownPillEl = document.getElementById('countdownPill');
         const collapseBtn = document.getElementById('collapseBtn');
@@ -852,7 +964,7 @@
             if (info.status === 'upcoming') {
                 phaseLabelEl.textContent = 'Counting down to';
                 setLocalizedText(phaseNameEl, info.phase.label);
-                phaseBlurbEl.textContent = ''; // phase.blurb is a live-day claim ("Today is মহালয়া ") — wrong to show while still counting down
+                phaseBlurbEl.textContent = '';
                 phaseBlurbEl.removeAttribute('lang');
                 setLocalizedText(subheadingEl, `${info.phase.label} অপেক্ষা`);
                 countdownGridEl.style.display = 'flex';
@@ -876,7 +988,7 @@
                 countdownGridEl.style.display = 'none';
             }
 
-            setupPhaseAudio(info.phase.key);
+            updateAudioForPhase(info);
             refreshBackground(info);
             setLocalizedText(countdownPillEl, formatPillText(info, now));
         }
@@ -884,7 +996,6 @@
         renderPhase();
         setInterval(renderPhase, 1000);
 
-        // ---- Expand / collapse ----
         const widget = document.getElementById('playerWidget');
         const icon = document.getElementById('playerIcon');
         icon.addEventListener('click', (e) => {
@@ -902,7 +1013,6 @@
             }
         });
 
-        // ---- Playback ----
         playBtn.addEventListener('click', () => {
             if (!currentPlaylist.length) return;
             if (!audioEl.src) {
@@ -911,7 +1021,7 @@
                 audioEl.play().catch(() => {});
             } else {
                 audioEl.pause();
-                if (userInteracted) fadeInTheme(); // explicit stop -> bring the ambient theme back
+                resumeThemeIfEligible();
             }
         });
         prevBtn.addEventListener('click', () => {
@@ -925,7 +1035,7 @@
             pauseIcon.style.display = '';
             playBtn.setAttribute('aria-label', 'Pause');
             icon.classList.add('playing');
-            pauseTheme(); // any playlist playback (manual or auto-advance) ducks the theme
+            pauseTheme();
         });
         audioEl.addEventListener('pause', () => {
             playIcon.style.display = '';
@@ -938,8 +1048,8 @@
             const nextIndex = currentTrackIndex + 1;
             if (nextIndex < currentPlaylist.length) {
                 loadPlaylistTrack(nextIndex, true);
-            } else if (userInteracted) {
-                fadeInTheme(); // reached the end of the playlist -> bring the ambient theme back
+            } else {
+                resumeThemeIfEligible();
             }
         });
         audioEl.addEventListener('loadedmetadata', () => {
