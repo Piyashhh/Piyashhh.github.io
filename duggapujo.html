@@ -439,13 +439,13 @@
 
     <button type="button" class="countdown-pill" id="countdownPill" aria-label="Expand countdown"></button>
 
-    <!-- Music widget — ambient theme (auto, pre-Mahalaya only) + three browsable playlists -->
+    <!-- Music widget — three browsable playlists, no auto-playing theme -->
     <div class="player-widget" id="playerWidget">
         <div class="player-expanded-content">
             <div class="playlist-tabs" id="playlistTabs">
-                <button type="button" class="tab-btn" data-bucket="agomoni">Agomoni</button>
-                <button type="button" class="tab-btn" data-bucket="mahalaya">Mahalaya</button>
-                <button type="button" class="tab-btn" data-bucket="pujo">Pujo</button>
+                <button type="button" class="tab-btn" data-bucket="agomoni">আগমনী</button>
+                <button type="button" class="tab-btn" data-bucket="mahalaya">মহালয়া</button>
+                <button type="button" class="tab-btn" data-bucket="pujo">পুজো</button>
                 <button type="button" class="view-playlist-btn" id="viewPlaylistBtn" aria-label="View playlist">
                     <svg viewBox="0 0 24 24"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg>
                 </button>
@@ -486,8 +486,6 @@
 
     <!-- Playlist track playback -->
     <audio id="phaseAudio" preload="none"></audio>
-    <!-- Ambient theme — plays until Mahalaya, separate element so it can duck under the playlist independently -->
-    <audio id="themeAudio" preload="none"></audio>
 
     <script>
         // ===================================================================
@@ -613,7 +611,6 @@
         const cdSeconds = document.getElementById('cdSeconds');
 
         const audioEl = document.getElementById('phaseAudio'); // the playlist you browse manually
-        const themeAudioEl = document.getElementById('themeAudio'); // the ambient theme, plays on its own
         const trackTitleEl = document.getElementById('trackTitle');
         const trackArtistEl = document.getElementById('trackArtist');
         const viewPlaylistBtn = document.getElementById('viewPlaylistBtn');
@@ -636,29 +633,93 @@
             return `${m}:${s}`;
         }
 
-        // MP3 tagging (ID3) is a meaningfully different, messier binary format
-        // than FLAC's — versions vary (v2.2/2.3/2.4), text encodings vary, and
-        // I can't test a hand-rolled parser against real-world files here.
-        // Simpler and more reliable: derive the shown title from the filename
-        // itself. Name your files however you want them to display —
-        // hyphens/underscores become spaces and it's title-cased.
+        // MP3's ID3v2 tagging is genuinely reliable and near-universal — every
+        // common encoder/tagger writes it — so it's worth reading properly
+        // rather than falling back to filenames. Handles v2.3 and v2.4 (the
+        // two versions virtually everything in the wild uses); falls back to
+        // the filename if a file has no tag or something unexpected happens.
+        async function readId3Tags(url) {
+            try {
+                const res = await fetch(url, { headers: { Range: 'bytes=0-524287' } });
+                if (!res.ok) throw new Error('fetch failed');
+                const buf = await res.arrayBuffer();
+                const view = new DataView(buf);
+
+                if (view.getUint8(0) !== 0x49 || view.getUint8(1) !== 0x44 || view.getUint8(2) !== 0x33) {
+                    throw new Error('no ID3v2 tag'); // "ID3"
+                }
+                const majorVersion = view.getUint8(3);
+                const flags = view.getUint8(5);
+                const hasExtendedHeader = (flags & 0x40) !== 0;
+                // Tag size is "synchsafe": 7 usable bits per byte, MSB always 0
+                const tagSize = (view.getUint8(6) << 21) | (view.getUint8(7) << 14) | (view.getUint8(8) << 7) | view.getUint8(9);
+                const tagEnd = Math.min(10 + tagSize, buf.byteLength);
+
+                let offset = 10;
+                if (hasExtendedHeader) {
+                    const extSize = majorVersion >= 4
+                        ? (view.getUint8(offset) << 21) | (view.getUint8(offset + 1) << 14) | (view.getUint8(offset + 2) << 7) | view.getUint8(offset + 3)
+                        : view.getUint32(offset, false);
+                    offset += majorVersion >= 4 ? extSize : extSize + 4;
+                }
+
+                const tags = {};
+                while (offset + 10 <= tagEnd) {
+                    const frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset + 1), view.getUint8(offset + 2), view.getUint8(offset + 3));
+                    if (frameId === '\u0000\u0000\u0000\u0000') break; // padding reached
+
+                    // Frame size is synchsafe in v2.4, a plain big-endian int in v2.3
+                    const frameSize = majorVersion >= 4
+                        ? (view.getUint8(offset + 4) << 21) | (view.getUint8(offset + 5) << 14) | (view.getUint8(offset + 6) << 7) | view.getUint8(offset + 7)
+                        : view.getUint32(offset + 4, false);
+                    const contentStart = offset + 10;
+
+                    if ((frameId === 'TIT2' || frameId === 'TPE1') && frameSize > 0 && contentStart + frameSize <= buf.byteLength) {
+                        const encodingByte = view.getUint8(contentStart);
+                        const textBytes = new Uint8Array(buf, contentStart + 1, frameSize - 1);
+                        let text = '';
+                        try {
+                            if (encodingByte === 0x00) {
+                                text = new TextDecoder('windows-1252').decode(textBytes);
+                            } else if (encodingByte === 0x01) {
+                                const little = textBytes.length < 2 || textBytes[0] === 0xFF;
+                                const hasBOM = textBytes.length >= 2 && ((textBytes[0] === 0xFF && textBytes[1] === 0xFE) || (textBytes[0] === 0xFE && textBytes[1] === 0xFF));
+                                text = new TextDecoder(little ? 'utf-16le' : 'utf-16be').decode(hasBOM ? textBytes.slice(2) : textBytes);
+                            } else if (encodingByte === 0x02) {
+                                text = new TextDecoder('utf-16be').decode(textBytes);
+                            } else {
+                                text = new TextDecoder('utf-8').decode(textBytes);
+                            }
+                        } catch (e) { text = ''; }
+                        text = text.replace(/\u0000+$/, '').trim();
+                        if (text) {
+                            if (frameId === 'TIT2') tags.title = text;
+                            if (frameId === 'TPE1') tags.artist = text;
+                        }
+                    }
+                    offset = contentStart + frameSize;
+                }
+                return { title: tags.title || null, artist: tags.artist || null };
+            } catch (err) {
+                console.warn('ID3 metadata read failed:', url, err.message);
+                return { title: null, artist: null };
+            }
+        }
+
+        // Last-resort fallback when a file has no readable tag at all.
         function titleFromFilename(url) {
             const base = url.split('/').pop().replace(/\.[^.]+$/, '');
-            return base
-                .replace(/[-_]+/g, ' ')
-                .replace(/\b\w/g, (c) => c.toUpperCase());
+            return base.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
         }
 
         // ===================================================================
-        // Theme + Playlists
+        // Playlists
         // ===================================================================
-        // Four fixed buckets instead of one per named day:
-        //   theme.mp3                        — ambient, auto-plays, plays until Mahalaya, not browsable
-        //   agomoni1.mp3 .. agomoni10.mp3     — playlist for the pre-Mahalaya countdown
-        //   mahalaya1.mp3 .. mahalaya10.mp3   — playlist for Mahalaya day itself
-        //   pujo1.mp3 .. pujo10.mp3           — playlist for every day after Mahalaya through Dashami
-        // Whichever numbered files actually exist get used — nothing breaks
-        // if most slots aren't uploaded yet.
+        // Three named playlists. File convention:
+        //   agomoni1.mp3 .. agomoni10.mp3   — pre-Mahalaya countdown
+        //   mahalaya1.mp3 .. mahalaya10.mp3 — Mahalaya day itself
+        //   pujo1.mp3 .. pujo10.mp3         — every day after Mahalaya through Dashami
+        // Whichever numbered files actually exist get used.
         const PLAYLIST_BUCKETS = ['agomoni', 'mahalaya', 'pujo'];
 
         function probeFileExists(url) {
@@ -668,13 +729,15 @@
         async function buildBucketPlaylist(bucket) {
             const candidateUrls = [];
             for (let i = 1; i <= 10; i++) candidateUrls.push(`${bucket}${i}.mp3`);
-            const checks = await Promise.all(candidateUrls.map(async (url) => (await probeFileExists(url)) ? url : null));
-            return checks.filter(Boolean);
+            const foundUrls = (await Promise.all(candidateUrls.map(async (url) => (await probeFileExists(url)) ? url : null))).filter(Boolean);
+            return Promise.all(foundUrls.map(async (src) => {
+                const meta = await readId3Tags(src);
+                return { src, title: meta.title || titleFromFilename(src), artist: meta.artist || '' };
+            }));
         }
 
-        // Which bucket the current moment points to by default — the user can
-        // still manually flip to a different tab; this only decides what's
-        // pre-selected and when the ambient theme is eligible to play.
+        // Which playlist the current moment points to by default — the user
+        // can still manually flip to a different tab.
         function getDefaultBucket(info) {
             if (info.status === 'upcoming') return 'agomoni';
             if (info.status === 'live' && info.phase.key === 'mahalaya') return 'mahalaya';
@@ -682,85 +745,15 @@
             return null; // 'over' — nothing plays
         }
 
-        let userInteracted = false;
-        let themeUrlPromise = null; // resolves once, doesn't need re-probing per phase
-        let currentBucket = null;
+        // 'viewed' (what the tabs/track-list show) and 'playing' (what's
+        // actually loaded in the player) are deliberately separate — browsing
+        // a different tab must never touch what's currently playing.
+        let viewedBucket = null;
+        let playingBucket = null;
+        let playingIndex = -1;
+        let hasEverPlayed = false;
         let userPickedBucket = false; // once true, stop auto-switching tabs on phase change
-        let currentPlaylist = [];
-        let currentTrackIndex = 0;
-        let bucketCache = {}; // bucket name -> resolved playlist, so re-visiting a tab doesn't re-probe
-
-        function fadeInTheme(targetVolume = 0.3, duration = 3000) {
-            if (!themeAudioEl.src) return;
-            themeAudioEl.volume = 0;
-            themeAudioEl.play().catch(() => {});
-            const steps = 30;
-            const stepMs = duration / steps;
-            let step = 0;
-            const timer = setInterval(() => {
-                step++;
-                themeAudioEl.volume = Math.min(targetVolume, (targetVolume * step) / steps);
-                if (step >= steps) clearInterval(timer);
-            }, stepMs);
-        }
-        function pauseTheme() { themeAudioEl.pause(); }
-        function resumeThemeIfEligible() {
-            if (!userInteracted) return;
-            const info = getPhaseStatus(DUGGA_PUJO_PHASES, new Date());
-            if (info.status === 'upcoming') fadeInTheme();
-        }
-
-        function updatePlaylistUI() {
-            const hasTracks = currentPlaylist.length > 0;
-            playBtn.disabled = !hasTracks;
-            prevBtn.disabled = !hasTracks;
-            nextBtn.disabled = !hasTracks;
-            progressBar.disabled = !hasTracks;
-            if (!hasTracks) {
-                setLocalizedText(trackTitleEl, 'No tracks yet');
-                trackArtistEl.textContent = '';
-                trackArtistEl.removeAttribute('lang');
-                audioEl.pause();
-                audioEl.removeAttribute('src');
-                progressBar.value = 0;
-                currentTimeLabel.textContent = '0:00';
-                durationLabel.textContent = '0:00';
-            }
-            renderTrackList();
-        }
-
-        function renderTrackList() {
-            trackListEl.innerHTML = '';
-            if (!currentPlaylist.length) {
-                const empty = document.createElement('div');
-                empty.className = 'track-list-empty';
-                empty.textContent = 'No tracks in this playlist yet.';
-                trackListEl.appendChild(empty);
-                return;
-            }
-            currentPlaylist.forEach((src, i) => {
-                const item = document.createElement('button');
-                item.type = 'button';
-                item.className = 'track-list-item' + (i === currentTrackIndex ? ' current' : '');
-                item.textContent = titleFromFilename(src);
-                item.addEventListener('click', () => loadPlaylistTrack(i, true));
-                trackListEl.appendChild(item);
-            });
-        }
-
-        function loadPlaylistTrack(index, autoPlay) {
-            if (!currentPlaylist.length) return;
-            currentTrackIndex = ((index % currentPlaylist.length) + currentPlaylist.length) % currentPlaylist.length;
-            const src = currentPlaylist[currentTrackIndex];
-
-            setLocalizedText(trackTitleEl, titleFromFilename(src));
-            trackArtistEl.textContent = '\u00A0';
-            trackArtistEl.removeAttribute('lang');
-
-            audioEl.src = src;
-            if (autoPlay) audioEl.play().catch(() => {});
-            renderTrackList();
-        }
+        let bucketCache = {}; // bucket name -> resolved [{src,title,artist}], so re-visiting a tab doesn't re-probe
 
         function setActiveTab(bucket) {
             document.querySelectorAll('.tab-btn').forEach((btn) => {
@@ -768,31 +761,69 @@
             });
         }
 
-        async function switchToBucket(bucket) {
-            currentBucket = bucket;
-            setActiveTab(bucket);
-            audioEl.pause();
-            currentTrackIndex = 0;
+        async function getBucketTracks(bucket) {
+            if (bucketCache[bucket]) return bucketCache[bucket];
+            const tracks = await buildBucketPlaylist(bucket);
+            bucketCache[bucket] = tracks;
+            return tracks;
+        }
 
-            if (bucketCache[bucket]) {
-                currentPlaylist = bucketCache[bucket];
-                updatePlaylistUI();
+        function renderTrackList(tracks) {
+            trackListEl.innerHTML = '';
+            if (!tracks.length) {
+                const empty = document.createElement('div');
+                empty.className = 'track-list-empty';
+                empty.textContent = 'No tracks in this playlist yet.';
+                trackListEl.appendChild(empty);
                 return;
             }
-            currentPlaylist = [];
-            updatePlaylistUI();
-            const playlist = await buildBucketPlaylist(bucket);
-            bucketCache[bucket] = playlist;
-            if (currentBucket === bucket) { // user might have tabbed away while this was loading
-                currentPlaylist = playlist;
-                updatePlaylistUI();
-            }
+            tracks.forEach((track, i) => {
+                const isCurrent = viewedBucket === playingBucket && i === playingIndex;
+                const item = document.createElement('button');
+                item.type = 'button';
+                item.className = 'track-list-item' + (isCurrent ? ' current' : '');
+                item.textContent = track.artist ? `${track.title} — ${track.artist}` : track.title;
+                item.addEventListener('click', () => playFromBucket(viewedBucket, i, true));
+                trackListEl.appendChild(item);
+            });
+        }
+
+        // Changes which playlist is BROWSABLE (tab highlight + track list).
+        // Never touches audioEl — purely a viewing concern.
+        async function viewBucket(bucket) {
+            viewedBucket = bucket;
+            setActiveTab(bucket);
+            const tracks = await getBucketTracks(bucket);
+            if (viewedBucket === bucket) renderTrackList(tracks); // guard against a stale response if tabbed again quickly
+            return tracks;
+        }
+
+        // The ONLY function allowed to touch audioEl / actual playback.
+        function playFromBucket(bucket, index, autoPlay) {
+            const tracks = bucketCache[bucket] || [];
+            if (!tracks.length) return;
+            playingBucket = bucket;
+            playingIndex = ((index % tracks.length) + tracks.length) % tracks.length;
+            const track = tracks[playingIndex];
+
+            setLocalizedText(trackTitleEl, track.title);
+            setLocalizedText(trackArtistEl, track.artist || '\u00A0');
+
+            audioEl.src = track.src;
+            if (autoPlay) audioEl.play().catch(() => {});
+
+            playBtn.disabled = false;
+            prevBtn.disabled = false;
+            nextBtn.disabled = false;
+            progressBar.disabled = false;
+
+            if (viewedBucket === bucket) renderTrackList(tracks);
         }
 
         document.querySelectorAll('.tab-btn').forEach((btn) => {
             btn.addEventListener('click', () => {
                 userPickedBucket = true;
-                switchToBucket(btn.dataset.bucket);
+                viewBucket(btn.dataset.bucket);
             });
         });
 
@@ -800,42 +831,18 @@
             trackListEl.classList.toggle('open');
         });
 
-        async function ensureThemeLoaded() {
-            if (themeUrlPromise) return themeUrlPromise;
-            themeUrlPromise = probeFileExists('theme.mp3').then((exists) => exists ? 'theme.mp3' : null);
-            const url = await themeUrlPromise;
-            themeAudioEl.src = url || '';
-            return url;
-        }
-
-        // Called every render tick; only actually acts the first time and on
-        // real bucket-default changes, everything else is cheap no-ops.
+        // Called every render tick; cheap no-op once the default bucket has
+        // been picked and something has been loaded — the guards below make
+        // sure this never fights the user for control once they've engaged.
         async function updateAudioForPhase(info) {
-            const themeUrl = await ensureThemeLoaded();
-            const stillUpcoming = info.status === 'upcoming';
-
-            if (!userPickedBucket) {
-                const def = getDefaultBucket(info);
-                if (def && def !== currentBucket) switchToBucket(def);
-            }
-
-            if (userInteracted && stillUpcoming && themeUrl && audioEl.paused) {
-                fadeInTheme();
-            }
-            if (!stillUpcoming) {
-                pauseTheme(); // theme only ever belongs to the pre-Mahalaya wait
+            if (userPickedBucket) return;
+            const def = getDefaultBucket(info);
+            if (!def || def === viewedBucket) return;
+            const tracks = await viewBucket(def);
+            if (!hasEverPlayed && !playingBucket && tracks.length) {
+                playFromBucket(def, 0, false); // load immediately so it's ready the instant the panel opens — don't wait for Play
             }
         }
-
-        async function tryStartTheme() {
-            if (userInteracted) return;
-            userInteracted = true;
-            const themeUrl = await ensureThemeLoaded();
-            const info = getPhaseStatus(DUGGA_PUJO_PHASES, new Date());
-            if (themeUrl && info.status === 'upcoming' && audioEl.paused) fadeInTheme();
-        }
-        document.addEventListener('click', tryStartTheme, { once: true });
-        document.addEventListener('touchstart', tryStartTheme, { once: true });
 
         function setLocalizedText(el, text) {
             el.textContent = text;
@@ -948,7 +955,10 @@
             e.stopPropagation();
             setCountdownExpanded(false);
         });
-        countdownPillEl.addEventListener('click', () => setCountdownExpanded(true));
+        countdownPillEl.addEventListener('click', () => {
+            widget.classList.remove('expanded'); // only one panel open at a time
+            setCountdownExpanded(true);
+        });
 
         function formatPillText(info, now) {
             if (info.status === 'live') return `আজ ${info.phase.label}`;
@@ -1000,7 +1010,9 @@
         const icon = document.getElementById('playerIcon');
         icon.addEventListener('click', (e) => {
             e.stopPropagation();
+            const opening = !widget.classList.contains('expanded');
             widget.classList.toggle('expanded');
+            if (opening) setCountdownExpanded(false); // only one panel open at a time
         });
         document.addEventListener('click', (e) => {
             if (widget.classList.contains('expanded') && !widget.contains(e.target)) {
@@ -1014,28 +1026,27 @@
         });
 
         playBtn.addEventListener('click', () => {
-            if (!currentPlaylist.length) return;
-            if (!audioEl.src) {
-                loadPlaylistTrack(0, true);
-            } else if (audioEl.paused) {
+            if (!playingBucket) return;
+            if (audioEl.paused) {
                 audioEl.play().catch(() => {});
             } else {
                 audioEl.pause();
-                resumeThemeIfEligible();
             }
         });
         prevBtn.addEventListener('click', () => {
-            loadPlaylistTrack(currentTrackIndex - 1, !audioEl.paused);
+            if (!playingBucket) return;
+            playFromBucket(playingBucket, playingIndex - 1, !audioEl.paused);
         });
         nextBtn.addEventListener('click', () => {
-            loadPlaylistTrack(currentTrackIndex + 1, !audioEl.paused);
+            if (!playingBucket) return;
+            playFromBucket(playingBucket, playingIndex + 1, !audioEl.paused);
         });
         audioEl.addEventListener('play', () => {
+            hasEverPlayed = true;
             playIcon.style.display = 'none';
             pauseIcon.style.display = '';
             playBtn.setAttribute('aria-label', 'Pause');
             icon.classList.add('playing');
-            pauseTheme();
         });
         audioEl.addEventListener('pause', () => {
             playIcon.style.display = '';
@@ -1044,13 +1055,10 @@
             icon.classList.remove('playing');
         });
         audioEl.addEventListener('ended', () => {
-            if (!currentPlaylist.length) return;
-            const nextIndex = currentTrackIndex + 1;
-            if (nextIndex < currentPlaylist.length) {
-                loadPlaylistTrack(nextIndex, true);
-            } else {
-                resumeThemeIfEligible();
-            }
+            if (!playingBucket) return;
+            const tracks = bucketCache[playingBucket] || [];
+            const nextIndex = playingIndex + 1;
+            if (nextIndex < tracks.length) playFromBucket(playingBucket, nextIndex, true);
         });
         audioEl.addEventListener('loadedmetadata', () => {
             durationLabel.textContent = formatTime(audioEl.duration);
