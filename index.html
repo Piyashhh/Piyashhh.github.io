@@ -5,6 +5,9 @@
     <title>Piyashhh's Space Station</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+
+
+
       @font-face {
             font-family: 'MyLocalFont';
             src: url('customfont.ttf'); /* Update the extension if it is .woff2 or .otf */
@@ -285,6 +288,22 @@
             font-size: 0.9rem;
             white-space: nowrap;
         }
+
+            .nav-link-accent {
+                font-family: Jet, sans-serif;
+                display: block;
+            padding: 10px 14px;
+            border-radius: 12px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.9rem;
+            white-space: nowrap;
+                
+background-color: #b2d95f;
+padding: 5px;
+border-radius: 5px;
+margin: 10;
+}
         .nav-link:active { background: rgba(255, 255, 255, 0.12); }
 
         @media (prefers-reduced-motion: reduce) {
@@ -329,7 +348,7 @@
         <div class="nav-panel" id="navPanel">
             <a href="duggapujo.html" class="nav-link" lang="bn">পুজো আসছে</a>
 
-             <a href="noAI.html" class="nav-link" lang="en">Why is this button different</a>
+             <a href="noAI.html" class="nav-link-accent" lang="en">Why is this button different</a>
         </div>
         <button type="button" class="nav-icon" id="navIcon" aria-label="Menu">
             <svg class="icon-menu" viewBox="0 0 24 24"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="17" x2="20" y2="17"></line></svg>
