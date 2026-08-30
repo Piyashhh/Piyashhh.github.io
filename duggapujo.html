@@ -130,14 +130,13 @@
             stroke-linecap: round; stroke-linejoin: round;
         }
 
-        /* Collapsed state — a pill that fills the bar between the left edge
-           (or a left-side button, if this page ever gets one like the
-           homepage's hamburger menu — adjust the `left` value then) and the
-           music icon on the right, sitting on the same row as it. */
+        /* Collapsed state — a pill that fills the bar between the map icon
+           on the left and the music icon on the right, sitting on the same
+           row as both. */
         .countdown-pill {
             position: fixed;
             bottom: calc(24px + env(safe-area-inset-bottom, 0px));
-            left: 24px;
+            left: calc(24px + 56px + 12px); /* map icon's own 24px margin + its 56px icon + a 12px gap */
             right: calc(24px + 56px + 12px); /* music widget's own 24px margin + its 56px icon + a 12px gap */
             height: 56px;
             border-radius: 28px;
@@ -198,6 +197,35 @@
             font-size: 0.82rem;
             color: rgba(255, 255, 255, 0.72);
             line-height: 1.5;
+        }
+
+        /* ================================= */
+        /* Map button — mirrors the music    */
+        /* widget's icon on the opposite     */
+        /* side of the bottom bar            */
+        /* ================================= */
+        .map-icon {
+            position: fixed;
+            bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            left: 24px;
+            z-index: 20;
+            width: 56px; height: 56px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 200, 140, 0.3);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            transition: background 0.25s ease, transform 0.2s ease;
+        }
+        .map-icon:active { transform: scale(0.93); }
+        .map-icon svg {
+            width: 22px; height: 22px;
+            fill: none; stroke: #fff;
+            stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
         }
 
         /* ================================= */
@@ -448,6 +476,11 @@
 
     <button type="button" class="countdown-pill" id="countdownPill" aria-label="Expand countdown"></button>
 
+    <!-- Map button — mirrors the music-player button on the opposite side -->
+    <button type="button" class="map-icon" id="mapIcon" aria-label="Open map">
+        <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+    </button>
+
     <!-- Music widget — three browsable playlists, no auto-playing theme -->
     <div class="player-widget" id="playerWidget">
         <div class="player-expanded-content">
@@ -552,6 +585,16 @@
             bgCreditEl.textContent = `${BG_CREDIT.label} ${BG_CREDIT.name}`;
             bgCreditEl.style.display = 'block';
         }
+
+        // ===================================================================
+        // Map button — opens an external map link in a new tab.
+        // Swap in the real URL when it's ready.
+        // ===================================================================
+        const MAP_URL = '#';
+        const mapIcon = document.getElementById('mapIcon');
+        mapIcon.addEventListener('click', () => {
+            window.open(MAP_URL, '_blank', 'noopener,noreferrer');
+        });
 
         // ===================================================================
         // Dugga Pujo phases
@@ -1021,7 +1064,10 @@
             e.stopPropagation();
             const opening = !widget.classList.contains('expanded');
             widget.classList.toggle('expanded');
-            if (opening) setCountdownExpanded(false); // only one panel open at a time
+            if (opening) {
+                setCountdownExpanded(false); // only one panel open at a time
+                trackListEl.classList.add('open'); // playlist shows by default on open
+            }
         });
         document.addEventListener('click', (e) => {
             if (widget.classList.contains('expanded') && !widget.contains(e.target)) {
