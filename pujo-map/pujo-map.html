@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Pujo Map</title>
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- Top bar -->
+    <header class="topbar">
+
+        <div class="brand">
+            <h1>Pujo Map</h1>
+            <span id="pandal-count">Loading...</span>
+        </div>
+
+        <div class="search-wrapper">
+
+            <input
+                type="search"
+                id="search"
+                placeholder="Search pandals..."
+                autocomplete="off"
+            >
+
+            <button id="clear-search" aria-label="Clear search">
+                ×
+            </button>
+
+        </div>
+
+        <button id="plan-button">
+            My Plan
+            <span id="plan-count">0</span>
+        </button>
+
+    </header>
+
+
+    <!-- Search results -->
+    <div id="search-results"></div>
+
+
+    <!-- Map -->
+    <main>
+        <div id="map"></div>
+    </main>
+
+
+    <!-- Plan panel -->
+    <aside id="plan-panel">
+
+        <div class="plan-header">
+
+            <div>
+                <h2>My Pujo Plan</h2>
+                <span id="plan-summary">0 pandals</span>
+            </div>
+
+            <button id="close-plan">
+                ×
+            </button>
+
+        </div>
+
+
+        <div id="plan-list"></div>
+        
+        <div id="route-summary"></div>
+
+
+        <div class="plan-actions">
+
+    <button id="show-route">
+        Show Route
+    </button>
+
+    <button id="clear-plan">
+        Clear Plan
+    </button>
+
+</div>
+
+    </aside>
+
+
+    <!-- Leaflet -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- SheetJS -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+    <script src="app.js"></script>
+
+</body>
+</html>
