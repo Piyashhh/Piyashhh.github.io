@@ -1,5 +1,10 @@
 // ========================================
-// PUJO MAP — VERSION 0.3
+// PUJO MAP — VERSION 0.5
+// Data columns expected from the sheet:
+// "ID", "Name", "Address", "Lat", "Long", "Verification Status"
+// Verification Status is one of: verified, approximate,
+// unverified, pending, disputed. Disputed rows are filtered out
+// at load time and never reach the map.
 // ========================================
 
 
@@ -19,6 +24,33 @@ L.tileLayer(
         attribution: "&copy; OpenStreetMap contributors"
     }
 ).addTo(map);
+
+
+// ----------------------------------------
+// 1b. MARKER ICON
+// ----------------------------------------
+
+function pandalIcon(status, inPlan) {
+
+    const meta =
+        STATUS_META[status] ||
+        STATUS_META.unverified;
+
+    const size =
+        inPlan ? 26 : 20;
+
+    return L.divIcon({
+        className: "pandal-marker-wrap",
+        html: `
+            <div class="pandal-marker status-${status}${inPlan ? " in-plan" : ""}">
+                ${meta.icon}
+            </div>
+        `,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -(size / 2)]
+    });
+}
 
 
 // ----------------------------------------
@@ -118,8 +150,19 @@ async function loadPandals() {
         const sheet =
             workbook.Sheets[sheetName];
 
-        pandals =
+        const rawRows =
             XLSX.utils.sheet_to_json(sheet);
+
+        // Only verified/approximate pandals are kept — disputed,
+        // pending, and unverified rows are dropped here so they never
+        // become markers, search results, or plan candidates.
+        pandals =
+            rawRows.filter(
+                pandal =>
+                    VISIBLE_STATUSES.includes(
+                        statusKey(getVerificationStatus(pandal))
+                    )
+            );
 
 
         console.log(
@@ -162,10 +205,10 @@ function displayPandals(data) {
     data.forEach(pandal => {
 
         const lat =
-            Number(pandal["Latitude"]);
+            Number(pandal["Lat"]);
 
         const lng =
-            Number(pandal["Longitude"]);
+            Number(pandal["Long"]);
 
 
         if (
@@ -180,10 +223,15 @@ function displayPandals(data) {
 
 
         const marker =
-            L.marker([
-                lat,
-                lng
-            ]);
+            L.marker(
+                [lat, lng],
+                {
+                    icon: pandalIcon(
+                        statusKey(getVerificationStatus(pandal)),
+                        isInPlan(pandal)
+                    )
+                }
+            );
 
 
         marker.pandalData = pandal;
@@ -228,7 +276,7 @@ function createPandalPopup(pandal) {
 
     const name =
         escapeHTML(
-            pandal["Puja Name"] ||
+            pandal["Name"] ||
             "Unnamed Puja"
         );
 
@@ -240,13 +288,26 @@ function createPandalPopup(pandal) {
 
     const id =
         escapeHTML(
-            pandal["Pandal ID"] ||
+            pandal["ID"] ||
             ""
         );
 
+    const lat =
+        Number(pandal["Lat"]);
+
+    const lng =
+        Number(pandal["Long"]);
+
     const mapsUrl =
-        pandal["Google Maps Link"] ||
-        "#";
+        Number.isFinite(lat) && Number.isFinite(lng)
+            ? `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+            : "#";
+
+    const status =
+        statusKey(getVerificationStatus(pandal));
+
+    const statusMeta =
+        STATUS_META[status];
 
 
     const alreadyAdded =
@@ -255,40 +316,53 @@ function createPandalPopup(pandal) {
 
     const addButtonText =
         alreadyAdded
-            ? "✓ In My Plan"
+            ? "\u2713 In My Plan"
             : "+ Add to Plan";
 
 
     return `
         <div class="pandal-popup">
 
-            <h3>${name}</h3>
+            <div class="pandal-popup-body">
 
-            <span class="pandal-id">
-                ${id}
-            </span>
+                <h3>${name}</h3>
 
-            <div class="pandal-address">
-                ${address}
-            </div>
+                <div class="pandal-meta">
 
-            <div class="popup-buttons">
+                    <span class="pandal-id">
+                        ${id}
+                    </span>
 
-                <a
-                    class="maps-button"
-                    href="${mapsUrl}"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Navigate
-                </a>
+                    <span class="status-badge status-${status}">
+                        ${statusMeta.icon}
+                        <span>${statusMeta.label}</span>
+                    </span>
 
-                <button
-                    class="add-plan-button"
-                    onclick="togglePlan('${escapeAttribute(id)}')"
-                >
-                    ${addButtonText}
-                </button>
+                </div>
+
+                <div class="pandal-address">
+                    ${address}
+                </div>
+
+                <div class="popup-buttons">
+
+                    <a
+                        class="maps-button"
+                        href="${mapsUrl}"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Navigate
+                    </a>
+
+                    <button
+                        class="add-plan-button"
+                        onclick="togglePlan('${escapeAttribute(id)}')"
+                    >
+                        ${addButtonText}
+                    </button>
+
+                </div>
 
             </div>
 
@@ -304,12 +378,12 @@ function createPandalPopup(pandal) {
 function isInPlan(pandal) {
 
     const id =
-        String(pandal["Pandal ID"]);
+        String(pandal["ID"]);
 
 
     return plan.some(
         item =>
-            String(item["Pandal ID"]) === id
+            String(item["ID"]) === id
     );
 }
 
@@ -323,7 +397,7 @@ function togglePlan(id) {
     const index =
         plan.findIndex(
             item =>
-                String(item["Pandal ID"]) ===
+                String(item["ID"]) ===
                 String(id)
         );
 
@@ -341,7 +415,7 @@ function togglePlan(id) {
         const pandal =
             pandals.find(
                 item =>
-                    String(item["Pandal ID"]) ===
+                    String(item["ID"]) ===
                     String(id)
             );
 
@@ -363,7 +437,7 @@ function togglePlan(id) {
         markers.find(
             marker =>
                 String(
-                    marker.pandalData["Pandal ID"]
+                    marker.pandalData["ID"]
                 ) === String(id)
         );
 
@@ -373,6 +447,13 @@ function togglePlan(id) {
         marker.setPopupContent(
             createPandalPopup(
                 marker.pandalData
+            )
+        );
+
+        marker.setIcon(
+            pandalIcon(
+                statusKey(getVerificationStatus(marker.pandalData)),
+                isInPlan(marker.pandalData)
             )
         );
 
@@ -453,7 +534,7 @@ function updatePlanUI() {
 
                     <div class="plan-name">
                         ${escapeHTML(
-                            pandal["Puja Name"] ||
+                            pandal["Name"] ||
                             "Unnamed Puja"
                         )}
                     </div>
@@ -470,7 +551,7 @@ function updatePlanUI() {
                 <button
                     class="remove-plan-item"
                     data-id="${escapeAttribute(
-                        pandal["Pandal ID"]
+                        pandal["ID"]
                     )}"
                 >
                     ×
@@ -586,7 +667,7 @@ item.addEventListener(
                 () => {
 
                     togglePlan(
-                        pandal["Pandal ID"]
+                        pandal["ID"]
                     );
 
                 }
@@ -607,10 +688,10 @@ item.addEventListener(
 function focusPandal(pandal) {
 
     const lat =
-        Number(pandal["Latitude"]);
+        Number(pandal["Lat"]);
 
     const lng =
-        Number(pandal["Longitude"]);
+        Number(pandal["Long"]);
 
 
     if (
@@ -634,10 +715,10 @@ function focusPandal(pandal) {
         markers.find(
             marker =>
                 String(
-                    marker.pandalData["Pandal ID"]
+                    marker.pandalData["ID"]
                 ) ===
                 String(
-                    pandal["Pandal ID"]
+                    pandal["ID"]
                 )
         );
 
@@ -726,13 +807,20 @@ document.getElementById(
         savePlan();
 
 
-        // Refresh all marker popups
+        // Refresh all marker popups and icons
         markers.forEach(
             marker => {
 
                 marker.setPopupContent(
                     createPandalPopup(
                         marker.pandalData
+                    )
+                );
+
+                marker.setIcon(
+                    pandalIcon(
+                        statusKey(getVerificationStatus(marker.pandalData)),
+                        false
                     )
                 );
 
@@ -800,7 +888,7 @@ function handleSearch() {
 
                 const name =
                     String(
-                        pandal["Puja Name"] ||
+                        pandal["Name"] ||
                         ""
                     ).toLowerCase();
 
@@ -870,7 +958,7 @@ function displaySearchResults(results) {
                 <div class="search-result-name">
 
                     ${escapeHTML(
-                        pandal["Puja Name"] ||
+                        pandal["Name"] ||
                         "Unnamed Puja"
                     )}
 
@@ -929,7 +1017,7 @@ function showMatchingMarkers(results) {
             results.map(
                 pandal =>
                     String(
-                        pandal["Pandal ID"]
+                        pandal["ID"]
                     )
             )
         );
@@ -940,7 +1028,7 @@ function showMatchingMarkers(results) {
 
             const id =
                 String(
-                    marker.pandalData["Pandal ID"]
+                    marker.pandalData["ID"]
                 );
 
 
@@ -1036,6 +1124,68 @@ function escapeAttribute(value) {
         .replaceAll("'", "\\'");
 }
 
+
+// ----------------------------------------
+// VERIFICATION STATUS
+// Single source of truth for label + icon per status, used by
+// both the map markers and the popup tab. "Disputed" is valid
+// input but is always filtered out before it gets here.
+// ----------------------------------------
+
+const STATUS_META = {
+    verified: {
+        label: "Verified",
+        icon: `<svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5L6.5 11.5L12.5 4.5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    },
+    approximate: {
+        label: "Approximate",
+        icon: `<svg viewBox="0 0 16 16" fill="none"><path d="M2.3 8C3.3 6.2 4.8 6.2 5.8 8C6.8 9.8 8.3 9.8 9.3 8C10.3 6.2 11.8 6.2 12.8 8" stroke="white" stroke-width="1.7" stroke-linecap="round"/></svg>`
+    },
+    unverified: {
+        label: "Unverified",
+        icon: `<svg viewBox="0 0 16 16" fill="none"><path d="M8 2.3L14.3 13.2H1.7L8 2.3Z" stroke="white" stroke-width="1.4" stroke-linejoin="round"/><line x1="8" y1="6.6" x2="8" y2="9.5" stroke="white" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.1" r="0.85" fill="white"/></svg>`
+    },
+    pending: {
+        label: "Pending",
+        icon: `<svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.3" stroke="white" stroke-width="1.4"/><path d="M8 5.2V8.2L10.1 9.9" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    }
+};
+
+const VALID_STATUSES =
+    ["verified", "approximate", "unverified", "pending", "disputed"];
+
+function statusKey(raw) {
+
+    const key =
+        String(raw || "")
+            .trim()
+            .toLowerCase();
+
+    return VALID_STATUSES.includes(key) ? key : "unverified";
+}
+
+// Defensive lookup: reads a row's verification status by matching the
+// header name case-/whitespace-insensitively, instead of assuming the
+// column is spelled exactly "Verification Status". A silent header
+// mismatch here was why every marker was previously falling back to
+// "unverified" regardless of its real status.
+function getVerificationStatus(pandal) {
+
+    for (const key of Object.keys(pandal)) {
+
+        if (key.trim().toLowerCase() === "verification status") {
+            return pandal[key];
+        }
+    }
+
+    return undefined;
+}
+
+// Only these statuses are shown on the map at all — pending and
+// unverified pandals are hidden (and disputed always was) to keep
+// the marker count, and therefore map performance, manageable.
+const VISIBLE_STATUSES = ["verified", "approximate"];
+
 // ----------------------------------------
 // ROUTING
 // ----------------------------------------
@@ -1056,10 +1206,10 @@ async function showRoute() {
         .map(pandal => {
 
             const lat =
-                Number(pandal["Latitude"]);
+                Number(pandal["Lat"]);
 
             const lng =
-                Number(pandal["Longitude"]);
+                Number(pandal["Long"]);
 
             return `${lng},${lat}`;
         })
